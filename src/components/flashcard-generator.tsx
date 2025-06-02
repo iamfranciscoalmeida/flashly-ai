@@ -12,11 +12,14 @@ import {
   X,
   Check,
   Brain,
+  BookOpen,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "../../supabase/client";
 import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
+import GenerateFlashcardsModal from "./generate-flashcards-modal";
 
 interface Document {
   id: string;
@@ -25,10 +28,21 @@ interface Document {
   folder_id?: string | null;
 }
 
+interface Module {
+  id: string;
+  title: string;
+  document_id: string;
+  order: number;
+  summary: string | null;
+  created_at: string;
+  completed?: boolean;
+}
+
 interface Flashcard {
   id: string;
   question: string;
   answer: string;
+  module_id?: string | null;
 }
 
 interface Quiz {
@@ -36,14 +50,17 @@ interface Quiz {
   question: string;
   options: string[];
   correct: string;
+  module_id?: string | null;
 }
 
 interface FlashcardGeneratorProps {
   document: Document | null;
+  selectedModule?: Module | null;
 }
 
 export default function FlashcardGenerator({
   document,
+  selectedModule = null,
 }: FlashcardGeneratorProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -60,6 +77,8 @@ export default function FlashcardGenerator({
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [quizScore, setQuizScore] = useState({ correct: 0, total: 0 });
+  const [moduleSummary, setModuleSummary] = useState<string | null>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -69,26 +88,54 @@ export default function FlashcardGenerator({
     } else {
       setFlashcards([]);
       setQuizzes([]);
+      setModuleSummary(null);
     }
-  }, [document]);
+  }, [document, selectedModule]);
 
   const fetchStudyContent = async () => {
     if (!document) return;
 
     try {
-      // Fetch flashcards
-      const { data: flashcardsData, error: flashcardsError } = await supabase
+      // Set module summary if a module is selected
+      if (selectedModule) {
+        setModuleSummary(selectedModule.summary);
+      } else {
+        setModuleSummary(null);
+      }
+
+      // Fetch flashcards - filter by module if selected
+      let flashcardsQuery = supabase
         .from("flashcards")
         .select("*")
         .eq("document_id", document.id);
 
+      if (selectedModule) {
+        flashcardsQuery = flashcardsQuery.eq("module_id", selectedModule.id);
+      } else {
+        // If no module is selected, only get flashcards without a module_id
+        // This maintains backward compatibility with older documents
+        flashcardsQuery = flashcardsQuery.is("module_id", null);
+      }
+
+      const { data: flashcardsData, error: flashcardsError } =
+        await flashcardsQuery;
+
       if (flashcardsError) throw flashcardsError;
 
-      // Fetch quizzes
-      const { data: quizzesData, error: quizzesError } = await supabase
+      // Fetch quizzes - filter by module if selected
+      let quizzesQuery = supabase
         .from("quizzes")
         .select("*")
         .eq("document_id", document.id);
+
+      if (selectedModule) {
+        quizzesQuery = quizzesQuery.eq("module_id", selectedModule.id);
+      } else {
+        // If no module is selected, only get quizzes without a module_id
+        quizzesQuery = quizzesQuery.is("module_id", null);
+      }
+
+      const { data: quizzesData, error: quizzesError } = await quizzesQuery;
 
       if (quizzesError) throw quizzesError;
 
@@ -281,7 +328,9 @@ export default function FlashcardGenerator({
           No study materials available
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          There was an issue generating study materials for this document.
+          {selectedModule
+            ? `No study materials found for module "${selectedModule.title}".`
+            : "There was an issue generating study materials for this document."}
         </p>
         <Button onClick={fetchStudyContent}>Retry</Button>
       </div>
@@ -290,6 +339,32 @@ export default function FlashcardGenerator({
 
   return (
     <div className="h-full flex flex-col">
+      {/* Module Summary Section */}
+      {moduleSummary && (
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="h-5 w-5 text-blue-600" />
+            <h3 className="font-medium text-blue-800">
+              {selectedModule?.title || "Module Summary"}
+            </h3>
+          </div>
+          <p className="text-sm text-blue-700">{moduleSummary}</p>
+        </div>
+      )}
+
+      {/* Generate Flashcards Button */}
+      {document && document.status === "completed" && (
+        <div className="mb-4">
+          <Button 
+            onClick={() => setShowGenerateModal(true)} 
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate AI Flashcards
+          </Button>
+        </div>
+      )}
+
       <div className="mb-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -527,6 +602,16 @@ export default function FlashcardGenerator({
           </TabsContent>
         </Tabs>
       </div>
+    </div>
+
+      {/* Generate Flashcards Modal */}
+      <GenerateFlashcardsModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        document={document}
+        folderId={document?.folder_id || null}
+        onGenerationComplete={fetchStudyContent}
+      />
     </div>
   );
 }

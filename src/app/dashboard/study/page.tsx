@@ -6,10 +6,11 @@ import DocumentList from "@/components/document-list";
 import FlashcardGenerator from "@/components/flashcard-generator";
 import DashboardViewToggle from "@/components/dashboard-view-toggle";
 import FolderSidebar from "@/components/folder-sidebar";
+import ModuleList from "@/components/module-list";
 import { createClient } from "../../../../supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+import { Upload, Layers } from "lucide-react";
 import Link from "next/link";
 
 interface Document {
@@ -20,15 +21,27 @@ interface Document {
   folder_id: string | null;
 }
 
+interface Module {
+  id: string;
+  title: string;
+  document_id: string;
+  order: number;
+  summary: string | null;
+  created_at: string;
+  completed?: boolean;
+}
+
 export default function StudyDashboard() {
   const [view, setView] = useState<"split" | "full">("split");
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(
     null,
   );
+  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [showModules, setShowModules] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -62,15 +75,27 @@ export default function StudyDashboard() {
 
   const handleSelectDocument = (document: Document) => {
     setSelectedDocument(document);
+    setSelectedModule(null); // Clear module selection when changing documents
+    setShowModules(true); // Show modules when a document is selected
+  };
+
+  const handleSelectModule = (module: Module) => {
+    setSelectedModule(module);
   };
 
   const handleSelectFolder = (folderId: string | null) => {
     setSelectedFolderId(folderId);
     setSelectedDocument(null); // Clear document selection when changing folders
+    setSelectedModule(null); // Clear module selection when changing folders
+    setShowModules(false); // Hide modules when changing folders
   };
 
   const handleViewChange = (newView: "split" | "full") => {
     setView(newView);
+  };
+
+  const toggleModuleView = () => {
+    setShowModules(!showModules);
   };
 
   if (loading) {
@@ -134,14 +159,51 @@ export default function StudyDashboard() {
                   />
                 )}
 
-                <h2 className="text-lg font-semibold mb-4">
-                  {selectedFolderId ? "Folder Documents" : "All Files"}
-                </h2>
+                {/* Toggle between documents and modules */}
+                {selectedDocument && (
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold">
+                      {showModules
+                        ? "Modules"
+                        : selectedFolderId
+                          ? "Folder Documents"
+                          : "All Files"}
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleModuleView}
+                      className="flex items-center gap-1"
+                    >
+                      <Layers className="h-4 w-4" />
+                      <span>
+                        {showModules ? "Show Documents" : "Show Modules"}
+                      </span>
+                    </Button>
+                  </div>
+                )}
 
-                <DocumentList
-                  onSelectDocument={handleSelectDocument}
-                  selectedFolderId={selectedFolderId}
-                />
+                {!selectedDocument || !showModules ? (
+                  // Show document list when no document is selected or modules view is not active
+                  <>
+                    {!selectedDocument && (
+                      <h2 className="text-lg font-semibold mb-4">
+                        {selectedFolderId ? "Folder Documents" : "All Files"}
+                      </h2>
+                    )}
+                    <DocumentList
+                      onSelectDocument={handleSelectDocument}
+                      selectedFolderId={selectedFolderId}
+                    />
+                  </>
+                ) : (
+                  // Show module list when a document is selected and modules view is active
+                  <ModuleList
+                    documentId={selectedDocument.id}
+                    onSelectModule={handleSelectModule}
+                    selectedModuleId={selectedModule?.id || null}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -150,7 +212,10 @@ export default function StudyDashboard() {
           <div
             className={`${view === "split" ? "lg:col-span-2" : ""} bg-card rounded-lg border p-6 h-[calc(100vh-200px)] overflow-auto`}
           >
-            <FlashcardGenerator document={selectedDocument} />
+            <FlashcardGenerator
+              document={selectedDocument}
+              selectedModule={selectedModule}
+            />
           </div>
         </div>
       </main>

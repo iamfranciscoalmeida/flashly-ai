@@ -285,10 +285,12 @@ export default function FileUpload({
               accept=".pdf,.doc,.docx,.txt"
               onChange={handleFileChange}
             />
-            <label htmlFor="file-upload">
-              <Button variant="outline" className="cursor-pointer">
-                Browse Files
-              </Button>
+            <label htmlFor="file-upload" className="w-full cursor-pointer">
+              <div className="w-full">
+                <Button variant="outline" className="w-full">
+                  Browse Files
+                </Button>
+              </div>
             </label>
           </div>
         ) : (
