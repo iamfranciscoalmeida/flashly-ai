@@ -81,7 +81,9 @@ export default async function Dashboard() {
                 <div className="text-2xl font-bold">{documentCount}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {isPremium
-                    ? "Unlimited uploads available"
+                    ? user.user_metadata?.limits?.uploads === "unlimited"
+                      ? "Unlimited uploads available"
+                      : `${documentCount}/${user.user_metadata?.limits?.uploads || 10} uploads used`
                     : `${documentCount}/1 free uploads used`}
                 </p>
               </CardContent>

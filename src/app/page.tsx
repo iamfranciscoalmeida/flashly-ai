@@ -18,6 +18,18 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Redirect authenticated users to dashboard
+  if (user) {
+    return Response.redirect(
+      new URL(
+        "/dashboard",
+        process.env.NODE_ENV === "development"
+          ? "http://localhost:3000"
+          : "https://yourdomain.com",
+      ),
+    );
+  }
+
   const { data: plans, error } = await supabase.functions.invoke(
     "supabase-functions-get-plans",
   );

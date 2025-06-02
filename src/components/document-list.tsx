@@ -224,6 +224,28 @@ export default function DocumentList({
     }
   };
 
+  // Function to check if a document has flashcards or quizzes
+  const checkStudyMaterials = async (documentId: string) => {
+    try {
+      // Check for flashcards
+      const { count: flashcardCount } = await supabase
+        .from("flashcards")
+        .select("*", { count: "exact", head: true })
+        .eq("document_id", documentId);
+
+      // Check for quizzes
+      const { count: quizCount } = await supabase
+        .from("quizzes")
+        .select("*", { count: "exact", head: true })
+        .eq("document_id", documentId);
+
+      return { flashcardCount, quizCount };
+    } catch (error) {
+      console.error("Error checking study materials:", error);
+      return { flashcardCount: 0, quizCount: 0 };
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">

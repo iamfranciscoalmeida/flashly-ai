@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-import { Upload, X, Folder } from "lucide-react";
+import { Upload, X, Folder, Brain, Loader2 } from "lucide-react";
 import { createClient } from "../../supabase/client";
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Progress } from "./ui/progress";
 
 interface Folder {
   id: string;
@@ -31,9 +32,11 @@ export default function FileUpload({
 }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [processingStatus, setProcessingStatus] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -69,9 +72,27 @@ export default function FileUpload({
   const handleUpload = async () => {
     if (!file) return;
 
+    // Get user to check plan limits
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get upload limit based on plan
+    const uploadLimit = user.user_metadata?.limits?.uploads || 1;
+    const isUnlimited = uploadLimit === "unlimited";
+
     // Check if user can upload more documents
     if (!isPremium && documentCount >= 1) {
       if (onUploadAttempt) onUploadAttempt();
+      return;
+    }
+
+    // For premium users, check their specific plan limits
+    if (isPremium && !isUnlimited && documentCount >= uploadLimit) {
+      alert(
+        `You've reached your plan's limit of ${uploadLimit} document uploads. Please upgrade your plan for more uploads.`,
+      );
       return;
     }
 
@@ -120,22 +141,69 @@ export default function FileUpload({
 
       if (dbError) throw dbError;
 
-      // Trigger processing (this would be a separate function)
-      // For now, we'll just simulate it by updating the status after a delay
-      setTimeout(async () => {
-        await supabase
-          .from("documents")
-          .update({ status: "completed" })
-          .eq("id", document.id);
+      setUploading(false);
+      setProcessing(true);
+      setProcessingStatus("Extracting text from document...");
 
-        onUploadComplete(document.id, file.name);
-      }, 3000);
+      // Call the AI processing API
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          documentId: document.id,
+          folderId: selectedFolder?.id || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to process document");
+      }
+
+      const result = await response.json();
+      console.log("AI processing result:", result);
+
+      // Set up a subscription to monitor document status changes
+      const subscription = supabase
+        .channel(`document-${document.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "documents",
+            filter: `id=eq.${document.id}`,
+          },
+          (payload) => {
+            const updatedDoc = payload.new as any;
+            if (updatedDoc.status === "completed") {
+              setProcessing(false);
+              onUploadComplete(document.id, file.name);
+              subscription.unsubscribe();
+            } else if (updatedDoc.status === "error") {
+              setProcessing(false);
+              console.error("Error processing document");
+              subscription.unsubscribe();
+            }
+          },
+        )
+        .subscribe();
+
+      // Clean up subscription after 5 minutes (failsafe)
+      setTimeout(
+        () => {
+          subscription.unsubscribe();
+        },
+        5 * 60 * 1000,
+      );
 
       setFile(null);
     } catch (error) {
       console.error("Error uploading file:", error);
-    } finally {
       setUploading(false);
+      setProcessing(false);
     }
   };
 
@@ -184,7 +252,27 @@ export default function FileUpload({
           </DropdownMenu>
         </div>
 
-        {!file ? (
+        {processing ? (
+          <div className="border rounded-lg p-6 bg-white">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="bg-blue-100 p-3 rounded-full mb-4">
+                <Brain className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                Processing Document
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                {processingStatus || "Generating flashcards and quizzes..."}
+              </p>
+              <div className="w-full max-w-md mb-4">
+                <Progress value={100} className="animate-pulse" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This may take a few moments depending on the document size
+              </p>
+            </div>
+          </div>
+        ) : !file ? (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50">
             <Upload className="h-10 w-10 text-gray-400 mb-2" />
             <p className="text-sm text-gray-500 mb-4">
@@ -194,7 +282,7 @@ export default function FileUpload({
               type="file"
               id="file-upload"
               className="hidden"
-              accept=".pdf,.doc,.docx"
+              accept=".pdf,.doc,.docx,.txt"
               onChange={handleFileChange}
             />
             <label htmlFor="file-upload">
@@ -241,11 +329,11 @@ export default function FileUpload({
             </div>
 
             {uploading && (
-              <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                <div
-                  className="bg-blue-600 h-2.5 rounded-full"
-                  style={{ width: `${progress}%` }}
-                ></div>
+              <div className="w-full mb-4">
+                <Progress value={progress} className="h-2" />
+                <p className="text-xs text-gray-500 mt-1 text-right">
+                  {progress}%
+                </p>
               </div>
             )}
 
@@ -255,7 +343,14 @@ export default function FileUpload({
                 disabled={uploading}
                 className="w-full sm:w-auto"
               >
-                {uploading ? "Uploading..." : "Upload Document"}
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload & Generate Study Materials"
+                )}
               </Button>
             </div>
           </div>

@@ -119,8 +119,24 @@ export default function FolderSidebar({
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
 
+    // Get user to check plan limits
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get folder limit based on plan
+    const folderLimit = user.user_metadata?.limits?.folders || 2;
+    const isUnlimited = folderLimit === "unlimited";
+
     // Check if user can create more folders
     if (!isPremium && folderCount >= 2) {
+      setShowUpsellDialog(true);
+      return;
+    }
+
+    // For premium users, check their specific plan limits
+    if (isPremium && !isUnlimited && folderCount >= folderLimit) {
       setShowUpsellDialog(true);
       return;
     }

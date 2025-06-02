@@ -4,264 +4,422 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
+  | Json[];
 
 export type Database = {
   public: {
     Tables: {
       documents: {
         Row: {
-          created_at: string | null
-          file_name: string
-          file_path: string
-          file_size: number
-          file_type: string
-          folder_id: string | null
-          id: string
-          status: string
-          updated_at: string | null
-          user_id: string
-        }
+          created_at: string | null;
+          file_name: string;
+          file_path: string;
+          file_size: number;
+          file_type: string;
+          folder_id: string | null;
+          id: string;
+          status: string;
+          updated_at: string | null;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string | null
-          file_name: string
-          file_path: string
-          file_size: number
-          file_type: string
-          folder_id?: string | null
-          id?: string
-          status?: string
-          updated_at?: string | null
-          user_id: string
-        }
+          created_at?: string | null;
+          file_name: string;
+          file_path: string;
+          file_size: number;
+          file_type: string;
+          folder_id?: string | null;
+          id?: string;
+          status?: string;
+          updated_at?: string | null;
+          user_id: string;
+        };
         Update: {
-          created_at?: string | null
-          file_name?: string
-          file_path?: string
-          file_size?: number
-          file_type?: string
-          folder_id?: string | null
-          id?: string
-          status?: string
-          updated_at?: string | null
-          user_id?: string
-        }
+          created_at?: string | null;
+          file_name?: string;
+          file_path?: string;
+          file_size?: number;
+          file_type?: string;
+          folder_id?: string | null;
+          id?: string;
+          status?: string;
+          updated_at?: string | null;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "documents_folder_id_fkey"
-            columns: ["folder_id"]
-            isOneToOne: false
-            referencedRelation: "folders"
-            referencedColumns: ["id"]
+            foreignKeyName: "documents_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "folders";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
+      flashcards: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          folder_id: string | null;
+          question: string;
+          answer: string;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          folder_id?: string | null;
+          question: string;
+          answer: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          document_id?: string;
+          folder_id?: string | null;
+          question?: string;
+          answer?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "flashcards_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "flashcards_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "folders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "flashcards_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       folders: {
         Row: {
-          created_at: string | null
-          id: string
-          name: string
-          user_id: string
-        }
+          created_at: string | null;
+          id: string;
+          name: string;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string | null
-          id?: string
-          name: string
-          user_id: string
-        }
+          created_at?: string | null;
+          id?: string;
+          name: string;
+          user_id: string;
+        };
         Update: {
-          created_at?: string | null
-          id?: string
-          name?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      subscriptions: {
+          created_at?: string | null;
+          id?: string;
+          name?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      processing_jobs: {
         Row: {
-          amount: number | null
-          cancel_at_period_end: boolean | null
-          canceled_at: number | null
-          created_at: string
-          currency: string | null
-          current_period_end: number | null
-          current_period_start: number | null
-          custom_field_data: Json | null
-          customer_cancellation_comment: string | null
-          customer_cancellation_reason: string | null
-          customer_id: string | null
-          ended_at: number | null
-          ends_at: number | null
-          id: string
-          interval: string | null
-          metadata: Json | null
-          price_id: string | null
-          started_at: number | null
-          status: string | null
-          stripe_id: string | null
-          stripe_price_id: string | null
-          updated_at: string
-          user_id: string | null
-        }
+          id: string;
+          user_id: string;
+          document_id: string;
+          status: string;
+          error_message: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          amount?: number | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: number | null
-          created_at?: string
-          currency?: string | null
-          current_period_end?: number | null
-          current_period_start?: number | null
-          custom_field_data?: Json | null
-          customer_cancellation_comment?: string | null
-          customer_cancellation_reason?: string | null
-          customer_id?: string | null
-          ended_at?: number | null
-          ends_at?: number | null
-          id?: string
-          interval?: string | null
-          metadata?: Json | null
-          price_id?: string | null
-          started_at?: number | null
-          status?: string | null
-          stripe_id?: string | null
-          stripe_price_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
+          id?: string;
+          user_id: string;
+          document_id: string;
+          status?: string;
+          error_message?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          amount?: number | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: number | null
-          created_at?: string
-          currency?: string | null
-          current_period_end?: number | null
-          current_period_start?: number | null
-          custom_field_data?: Json | null
-          customer_cancellation_comment?: string | null
-          customer_cancellation_reason?: string | null
-          customer_id?: string | null
-          ended_at?: number | null
-          ends_at?: number | null
-          id?: string
-          interval?: string | null
-          metadata?: Json | null
-          price_id?: string | null
-          started_at?: number | null
-          status?: string | null
-          stripe_id?: string | null
-          stripe_price_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
+          id?: string;
+          user_id?: string;
+          document_id?: string;
+          status?: string;
+          error_message?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
+            foreignKeyName: "processing_jobs_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+          {
+            foreignKeyName: "processing_jobs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quizzes: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          folder_id: string | null;
+          question: string;
+          options: Json;
+          correct: string;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          folder_id?: string | null;
+          question: string;
+          options: Json;
+          correct: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          document_id?: string;
+          folder_id?: string | null;
+          question?: string;
+          options?: Json;
+          correct?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quizzes_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "folders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quizzes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      subscriptions: {
+        Row: {
+          amount: number | null;
+          cancel_at_period_end: boolean | null;
+          canceled_at: number | null;
+          created_at: string;
+          currency: string | null;
+          current_period_end: number | null;
+          current_period_start: number | null;
+          custom_field_data: Json | null;
+          customer_cancellation_comment: string | null;
+          customer_cancellation_reason: string | null;
+          customer_id: string | null;
+          ended_at: number | null;
+          ends_at: number | null;
+          id: string;
+          interval: string | null;
+          metadata: Json | null;
+          price_id: string | null;
+          started_at: number | null;
+          status: string | null;
+          stripe_id: string | null;
+          stripe_price_id: string | null;
+          updated_at: string;
+          user_id: string | null;
+        };
+        Insert: {
+          amount?: number | null;
+          cancel_at_period_end?: boolean | null;
+          canceled_at?: number | null;
+          created_at?: string;
+          currency?: string | null;
+          current_period_end?: number | null;
+          current_period_start?: number | null;
+          custom_field_data?: Json | null;
+          customer_cancellation_comment?: string | null;
+          customer_cancellation_reason?: string | null;
+          customer_id?: string | null;
+          ended_at?: number | null;
+          ends_at?: number | null;
+          id?: string;
+          interval?: string | null;
+          metadata?: Json | null;
+          price_id?: string | null;
+          started_at?: number | null;
+          status?: string | null;
+          stripe_id?: string | null;
+          stripe_price_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          amount?: number | null;
+          cancel_at_period_end?: boolean | null;
+          canceled_at?: number | null;
+          created_at?: string;
+          currency?: string | null;
+          current_period_end?: number | null;
+          current_period_start?: number | null;
+          custom_field_data?: Json | null;
+          customer_cancellation_comment?: string | null;
+          customer_cancellation_reason?: string | null;
+          customer_id?: string | null;
+          ended_at?: number | null;
+          ends_at?: number | null;
+          id?: string;
+          interval?: string | null;
+          metadata?: Json | null;
+          price_id?: string | null;
+          started_at?: number | null;
+          status?: string | null;
+          stripe_id?: string | null;
+          stripe_price_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
       users: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          credits: string | null
-          email: string | null
-          full_name: string | null
-          id: string
-          image: string | null
-          name: string | null
-          subscription: string | null
-          token_identifier: string
-          updated_at: string | null
-          user_id: string | null
-        }
+          avatar_url: string | null;
+          created_at: string;
+          credits: string | null;
+          email: string | null;
+          full_name: string | null;
+          id: string;
+          image: string | null;
+          name: string | null;
+          subscription: string | null;
+          token_identifier: string;
+          updated_at: string | null;
+          user_id: string | null;
+        };
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          credits?: string | null
-          email?: string | null
-          full_name?: string | null
-          id: string
-          image?: string | null
-          name?: string | null
-          subscription?: string | null
-          token_identifier: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
+          avatar_url?: string | null;
+          created_at?: string;
+          credits?: string | null;
+          email?: string | null;
+          full_name?: string | null;
+          id: string;
+          image?: string | null;
+          name?: string | null;
+          subscription?: string | null;
+          token_identifier: string;
+          updated_at?: string | null;
+          user_id?: string | null;
+        };
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          credits?: string | null
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          image?: string | null
-          name?: string | null
-          subscription?: string | null
-          token_identifier?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+          avatar_url?: string | null;
+          created_at?: string;
+          credits?: string | null;
+          email?: string | null;
+          full_name?: string | null;
+          id?: string;
+          image?: string | null;
+          name?: string | null;
+          subscription?: string | null;
+          token_identifier?: string;
+          updated_at?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       webhook_events: {
         Row: {
-          created_at: string
-          data: Json | null
-          event_type: string
-          id: string
-          modified_at: string
-          stripe_event_id: string | null
-          type: string
-        }
+          created_at: string;
+          data: Json | null;
+          event_type: string;
+          id: string;
+          modified_at: string;
+          stripe_event_id: string | null;
+          type: string;
+        };
         Insert: {
-          created_at?: string
-          data?: Json | null
-          event_type: string
-          id?: string
-          modified_at?: string
-          stripe_event_id?: string | null
-          type: string
-        }
+          created_at?: string;
+          data?: Json | null;
+          event_type: string;
+          id?: string;
+          modified_at?: string;
+          stripe_event_id?: string | null;
+          type: string;
+        };
         Update: {
-          created_at?: string
-          data?: Json | null
-          event_type?: string
-          id?: string
-          modified_at?: string
-          stripe_event_id?: string | null
-          type?: string
-        }
-        Relationships: []
-      }
-    }
+          created_at?: string;
+          data?: Json | null;
+          event_type?: string;
+          id?: string;
+          modified_at?: string;
+          stripe_event_id?: string | null;
+          type?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Enums: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
@@ -269,7 +427,7 @@ export type Tables<
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
@@ -277,64 +435,64 @@ export type Tables<
         DefaultSchema["Views"])
     ? (DefaultSchema["Tables"] &
         DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
@@ -342,14 +500,14 @@ export type Enums<
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
@@ -357,10 +515,10 @@ export type CompositeTypes<
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
     Enums: {},
   },
-} as const
+} as const;

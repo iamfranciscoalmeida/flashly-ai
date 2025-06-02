@@ -65,6 +65,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
+  // Redirect authenticated users from home page to dashboard
+  if (req.nextUrl.pathname === "/" && session) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   return res;
 }
 

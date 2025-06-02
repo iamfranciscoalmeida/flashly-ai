@@ -7,6 +7,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Define plan limits
+const planLimits = {
+  free: {
+    uploads: 1,
+    folders: 2,
+    storage_mb: 100,
+  },
+  pro: {
+    uploads: 10,
+    folders: 10,
+    storage_mb: 2048, // 2 GB
+  },
+  ultra: {
+    uploads: "unlimited",
+    folders: "unlimited",
+    storage_mb: 5120, // 5 GB
+  },
+  school: {
+    uploads: "unlimited",
+    folders: "unlimited",
+    storage_mb: 10240, // 10 GB per seat
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -43,14 +67,48 @@ serve(async (req) => {
       .eq("status", "active")
       .maybeSingle();
 
+    // Determine the plan based on subscription
+    let plan = "free";
+    let isPro = false;
+    let periodEnd = null;
+
+    if (subscription) {
+      // Check if it's a pro or ultra plan based on price or metadata
+      if (
+        subscription.stripe_price_id?.includes("ultra") ||
+        subscription.metadata?.plan === "ultra" ||
+        subscription.amount >= 1900
+      ) {
+        // $19 or more
+        plan = "ultra";
+      } else if (
+        subscription.stripe_price_id?.includes("school") ||
+        subscription.metadata?.plan === "school"
+      ) {
+        plan = "school";
+      } else {
+        plan = "pro";
+      }
+
+      isPro = true;
+      periodEnd = subscription.current_period_end;
+    }
+
+    // Get the limits for the determined plan
+    const limits = planLimits[plan as keyof typeof planLimits];
+
     // If there's a subscription but user_metadata doesn't reflect it, update the metadata
-    if (subscription && user.user_metadata?.is_pro !== true) {
+    if (
+      subscription &&
+      (!user.user_metadata?.is_pro || user.user_metadata?.plan !== plan)
+    ) {
       await supabaseClient.auth.admin.updateUserById(user_id, {
         user_metadata: {
           ...user.user_metadata,
           is_pro: true,
-          plan: subscription.interval,
-          period_end: subscription.current_period_end,
+          plan: plan,
+          period_end: periodEnd,
+          limits: limits,
         },
       });
     }
@@ -61,8 +119,22 @@ serve(async (req) => {
         user_metadata: {
           ...user.user_metadata,
           is_pro: false,
-          plan: null,
+          plan: "free",
           period_end: null,
+          limits: planLimits.free,
+        },
+      });
+    }
+
+    // If user has no metadata about plans at all, set up the free plan
+    if (!user.user_metadata?.plan) {
+      await supabaseClient.auth.admin.updateUserById(user_id, {
+        user_metadata: {
+          ...user.user_metadata,
+          is_pro: false,
+          plan: "free",
+          period_end: null,
+          limits: planLimits.free,
         },
       });
     }
@@ -70,7 +142,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        is_premium: subscription ? true : false,
+        is_premium: isPro,
+        plan: plan,
+        limits: limits,
       }),
       {
         status: 200,

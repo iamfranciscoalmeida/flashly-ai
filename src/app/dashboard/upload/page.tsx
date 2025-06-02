@@ -30,8 +30,9 @@ export default function UploadPage() {
         return;
       }
 
-      // Check premium status
-      setIsPremium(user.user_metadata?.is_pro === true);
+      // Check premium status and plan limits
+      const isPro = user.user_metadata?.is_pro === true;
+      setIsPremium(isPro);
 
       // Get document count
       const { count } = await supabase

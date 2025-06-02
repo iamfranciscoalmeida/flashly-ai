@@ -41,11 +41,14 @@ export default function UpsellModal({ isOpen, onClose }: UpsellModalProps) {
           <h3 className="text-lg font-medium mb-4">Pro Plan Benefits:</h3>
           <ul className="space-y-3">
             {[
-              "Unlimited document uploads",
-              "Advanced AI-powered flashcards",
-              "Custom quiz generation",
+              "10 document uploads per month",
+              "Full quiz generation",
+              "All preset flashcard packs",
               "Spaced repetition learning",
-              "Export study materials",
+              "2 GB storage for your documents",
+              "Create up to 10 folders",
+              "Medium priority AI processing",
+              "Email premium support",
             ].map((benefit, index) => (
               <li key={index} className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
