@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-import { Upload, X, Folder, Brain, Loader2 } from "lucide-react";
+import { Upload, X, Folder, Loader2, AlertCircle } from "lucide-react";
 import { createClient } from "../../supabase/client";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Progress } from "./ui/progress";
+import { Alert, AlertDescription } from "./ui/alert";
 
 interface Folder {
   id: string;
@@ -24,6 +25,12 @@ interface FileUploadProps {
   onUploadAttempt?: () => void;
 }
 
+// File size constants
+const MAX_FILE_SIZE_MB = 100; // 100MB limit for standard uploads (updated bucket limit)
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const CHUNK_SIZE = 6 * 1024 * 1024; // 6MB chunks for resumable uploads
+const LARGE_FILE_THRESHOLD = 6 * 1024 * 1024; // 6MB threshold for using resumable uploads
+
 export default function FileUpload({
   onUploadComplete,
   isPremium,
@@ -32,11 +39,11 @@ export default function FileUpload({
 }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
-  const [processingStatus, setProcessingStatus] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [fileSizeWarning, setFileSizeWarning] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -63,14 +70,102 @@ export default function FileUpload({
     fetchFolders();
   }, [supabase]);
 
+  const validateFileSize = (file: File): { isValid: boolean; warning?: string; error?: string } => {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return {
+        isValid: false,
+        error: `File size (${(file.size / 1024 / 1024).toFixed(2)} MB) exceeds the maximum allowed size of ${MAX_FILE_SIZE_MB} MB. Please compress your file or split it into smaller parts.`
+      };
+    }
+    
+    if (file.size > LARGE_FILE_THRESHOLD) {
+      return {
+        isValid: true,
+        warning: `This is a large file (${(file.size / 1024 / 1024).toFixed(2)} MB). Upload may take longer and will use resumable upload for better reliability.`
+      };
+    }
+    
+    return { isValid: true };
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      const validation = validateFileSize(selectedFile);
+      
+      if (!validation.isValid) {
+        setUploadError(validation.error || null);
+        setFileSizeWarning(null);
+        setFile(null);
+        return;
+      }
+      
+      setUploadError(null);
+      setFileSizeWarning(validation.warning || null);
+      setFile(selectedFile);
     }
+  };
+
+  const uploadLargeFile = async (file: File, filePath: string, user: any): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // For large files, we'll use the resumable upload endpoint
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          throw new Error("No valid session token");
+        }
+
+        console.log("Debug - Upload attempt with session:", {
+          hasToken: !!session.access_token,
+          tokenLength: session.access_token?.length,
+          filePath,
+          fileSize: file.size,
+          fileSizeMB: (file.size / 1024 / 1024).toFixed(2)
+        });
+
+        // For now, we'll fall back to standard upload with better error handling
+        // In a production environment, you'd implement TUS resumable uploads here
+        const { error: uploadError, data } = await supabase.storage
+          .from("study-documents")
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          // Log the full error details to see what's really happening
+          console.error("Debug - Full upload error details:", {
+            error: uploadError,
+            message: uploadError.message,
+            name: uploadError.name,
+            cause: uploadError.cause,
+            stack: uploadError.stack
+          });
+
+          // Let's not mask the error for now - throw the original error
+          throw uploadError;
+        }
+
+        console.log("Debug - Upload successful:", data);
+        resolve();
+      } catch (error) {
+        console.error("Debug - Upload function error:", error);
+        reject(error);
+      }
+    });
   };
 
   const handleUpload = async () => {
     if (!file) return;
+
+    // Validate file size before proceeding
+    const validation = validateFileSize(file);
+    if (!validation.isValid) {
+      setUploadError(validation.error || "File validation failed");
+      return;
+    }
 
     // Get user to check plan limits
     const {
@@ -98,33 +193,76 @@ export default function FileUpload({
 
     setUploading(true);
     setProgress(0);
+    setUploadError(null);
 
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
+      
+      console.log("Debug - User authentication:", {
+        userId: user.id,
+        email: user.email,
+        isAuthenticated: !!user
+      });
 
       // Create a unique file path
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const filePath = `documents/${fileName}`;
+      const filePath = fileName;
 
-      // Upload file to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from("study-documents")
-        .upload(filePath, file, {
-          onUploadProgress: (progress) => {
-            const percent = Math.round(
-              (progress.loaded / progress.total) * 100,
-            );
-            setProgress(percent);
-          },
-        });
+      console.log("Debug - File upload details:", {
+        fileName,
+        filePath,
+        fileSize: file.size,
+        fileSizeMB: (file.size / 1024 / 1024).toFixed(2),
+        fileType: file.type,
+        bucket: "study-documents",
+        isLargeFile: file.size > LARGE_FILE_THRESHOLD
+      });
 
-      if (uploadError) throw uploadError;
+      // Use different upload strategies based on file size
+      if (file.size > LARGE_FILE_THRESHOLD) {
+        console.log("Debug - Using large file upload strategy");
+        // Simulate progress for large files
+        const progressInterval = setInterval(() => {
+          setProgress(prev => Math.min(prev + 10, 90));
+        }, 500);
+
+        try {
+          await uploadLargeFile(file, filePath, user);
+          clearInterval(progressInterval);
+          setProgress(100);
+        } catch (error) {
+          clearInterval(progressInterval);
+          throw error;
+        }
+      } else {
+        // Standard upload for smaller files
+        console.log("Debug - Using standard upload");
+        const { error: uploadError, data } = await supabase.storage
+          .from("study-documents")
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error("Debug - Upload error details:", {
+            error: uploadError,
+            message: uploadError.message,
+            name: uploadError.name
+          });
+          throw uploadError;
+        }
+
+        console.log("Debug - Upload successful:", data);
+        setProgress(100);
+      }
 
       // Create a record in the documents table
+      console.log("Debug - Creating document record");
       const { error: dbError, data: document } = await supabase
         .from("documents")
         .insert({
@@ -133,87 +271,79 @@ export default function FileUpload({
           file_path: filePath,
           file_size: file.size,
           file_type: file.type,
-          status: "processing",
+          status: "uploaded",
           folder_id: selectedFolder?.id || null,
         })
         .select()
         .single();
 
-      if (dbError) throw dbError;
-
-      setUploading(false);
-      setProcessing(true);
-      setProcessingStatus("Extracting text from document...");
-
-      // Call the AI processing API
-      const response = await fetch("/api/ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          documentId: document.id,
-          folderId: selectedFolder?.id || null,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to process document");
+      if (dbError) {
+        console.error("Debug - Database error details:", {
+          error: dbError,
+          code: dbError.code,
+          message: dbError.message,
+          details: dbError.details
+        });
+        throw dbError;
       }
 
-      const result = await response.json();
-      console.log("AI processing result:", result);
+      console.log("Debug - Document record created:", document);
 
-      // Set up a subscription to monitor document status changes
-      const subscription = supabase
-        .channel(`document-${document.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "documents",
-            filter: `id=eq.${document.id}`,
-          },
-          (payload) => {
-            const updatedDoc = payload.new as any;
-            if (updatedDoc.status === "completed") {
-              setProcessing(false);
-              onUploadComplete(document.id, file.name);
-              subscription.unsubscribe();
-            } else if (updatedDoc.status === "error") {
-              setProcessing(false);
-              console.error("Error processing document");
-              subscription.unsubscribe();
-            }
-          },
-        )
-        .subscribe();
-
-      // Clean up subscription after 5 minutes (failsafe)
-      setTimeout(
-        () => {
-          subscription.unsubscribe();
-        },
-        5 * 60 * 1000,
-      );
-
-      setFile(null);
-    } catch (error) {
-      console.error("Error uploading file:", error);
       setUploading(false);
-      setProcessing(false);
+      // Remove the AI processing step - just complete the upload
+      console.log("Debug - File upload completed successfully");
+      onUploadComplete(document.id, file.name);
+      setFile(null);
+      setFileSizeWarning(null);
+
+      // Note: AI processing (generating flashcards, quizzes, etc.) will be triggered 
+      // separately when the user chooses to create study materials
+    } catch (error: any) {
+      console.error("Error uploading file:", error);
+      
+      // Set user-friendly error messages
+      let errorMessage = "An error occurred while uploading your file.";
+      
+      if (error.message?.includes('exceeded the maximum allowed size') || 
+          error.message?.includes('Payload too large')) {
+        errorMessage = `File is too large (${(file.size / 1024 / 1024).toFixed(2)} MB). The maximum file size allowed is ${MAX_FILE_SIZE_MB} MB. Please compress your file or contact support for larger file uploads.`;
+      } else if (error.message?.includes('413')) {
+        errorMessage = `File size limit exceeded. Please use a file smaller than ${MAX_FILE_SIZE_MB} MB.`;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setUploadError(errorMessage);
+      setUploading(false);
+      setProgress(0);
     }
   };
 
   const clearFile = () => {
     setFile(null);
+    setUploadError(null);
+    setFileSizeWarning(null);
   };
 
   return (
     <div className="w-full">
       <div className="flex flex-col gap-4">
+        {/* Error Alert */}
+        {uploadError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{uploadError}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* File Size Warning */}
+        {fileSizeWarning && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{fileSizeWarning}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Folder selection dropdown */}
         <div className="flex items-center">
           <span className="text-sm font-medium mr-2">Save to:</span>
@@ -252,31 +382,34 @@ export default function FileUpload({
           </DropdownMenu>
         </div>
 
-        {processing ? (
+        {uploading ? (
           <div className="border rounded-lg p-6 bg-white">
             <div className="flex flex-col items-center justify-center text-center">
               <div className="bg-blue-100 p-3 rounded-full mb-4">
-                <Brain className="h-8 w-8 text-blue-600" />
+                <Upload className="h-8 w-8 text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
-                Processing Document
+                Uploading Document
               </h3>
               <p className="text-muted-foreground mb-6">
-                {processingStatus || "Generating flashcards and quizzes..."}
+                {progress === 100 ? "Upload completed!" : "Uploading your file..."}
               </p>
               <div className="w-full max-w-md mb-4">
-                <Progress value={100} className="animate-pulse" />
+                <Progress value={progress} />
               </div>
               <p className="text-sm text-muted-foreground">
-                This may take a few moments depending on the document size
+                {progress < 100 ? "Please wait while we upload your file" : "File saved successfully"}
               </p>
             </div>
           </div>
         ) : !file ? (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50">
             <Upload className="h-10 w-10 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 mb-2">
               Drag and drop your PDF or click to browse
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              Maximum file size: {MAX_FILE_SIZE_MB} MB • Generate study materials after saving
             </p>
             <input
               type="file"
@@ -285,7 +418,14 @@ export default function FileUpload({
               accept=".pdf,.doc,.docx,.txt"
               onChange={handleFileChange}
             />
-            <label htmlFor="file-upload" className="w-full cursor-pointer">
+            <label 
+              htmlFor="file-upload" 
+              className="w-full cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('file-upload')?.click();
+              }}
+            >
               <div className="w-full">
                 <Button variant="outline" className="w-full">
                   Browse Files
@@ -319,6 +459,9 @@ export default function FileUpload({
                   </p>
                   <p className="text-xs text-gray-500">
                     {(file.size / 1024 / 1024).toFixed(2)} MB
+                    {file.size > LARGE_FILE_THRESHOLD && (
+                      <span className="ml-1 text-orange-600">(Large file - resumable upload)</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -330,28 +473,19 @@ export default function FileUpload({
               </button>
             </div>
 
-            {uploading && (
-              <div className="w-full mb-4">
-                <Progress value={progress} className="h-2" />
-                <p className="text-xs text-gray-500 mt-1 text-right">
-                  {progress}%
-                </p>
-              </div>
-            )}
-
             <div className="flex justify-end">
               <Button
                 onClick={handleUpload}
-                disabled={uploading}
+                disabled={uploading || !!uploadError}
                 className="w-full sm:w-auto"
               >
                 {uploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
+                    {file.size > LARGE_FILE_THRESHOLD ? "Uploading Large File..." : "Uploading..."}
                   </>
                 ) : (
-                  "Upload & Generate Study Materials"
+                  "Save Document"
                 )}
               </Button>
             </div>

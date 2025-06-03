@@ -146,6 +146,9 @@ export type Database = {
           title: string
           updated_at: string | null
           user_id: string
+          start_page: number | null
+          end_page: number | null
+          content_excerpt: string | null
         }
         Insert: {
           created_at?: string | null
@@ -157,6 +160,9 @@ export type Database = {
           title: string
           updated_at?: string | null
           user_id: string
+          start_page?: number | null
+          end_page?: number | null
+          content_excerpt?: string | null
         }
         Update: {
           created_at?: string | null
@@ -168,6 +174,9 @@ export type Database = {
           title?: string
           updated_at?: string | null
           user_id?: string
+          start_page?: number | null
+          end_page?: number | null
+          content_excerpt?: string | null
         }
         Relationships: [
           {
@@ -240,6 +249,44 @@ export type Database = {
           },
           {
             foreignKeyName: "quizzes_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_materials: {
+        Row: {
+          id: string
+          module_id: string
+          type: 'flashcards' | 'quiz' | 'summary'
+          payload: Json
+          generated_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          module_id: string
+          type: 'flashcards' | 'quiz' | 'summary'
+          payload: Json
+          generated_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          module_id?: string
+          type?: 'flashcards' | 'quiz' | 'summary'
+          payload?: Json
+          generated_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_materials_module_id_fkey"
             columns: ["module_id"]
             isOneToOne: false
             referencedRelation: "modules"

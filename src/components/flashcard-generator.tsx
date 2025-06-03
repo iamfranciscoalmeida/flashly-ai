@@ -14,6 +14,8 @@ import {
   Brain,
   BookOpen,
   Sparkles,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { createClient } from "../../supabase/client";
 import { Textarea } from "./ui/textarea";
@@ -25,7 +27,7 @@ interface Document {
   id: string;
   file_name: string;
   status: "processing" | "completed" | "error";
-  folder_id?: string | null;
+  folder_id: string | null;
 }
 
 interface Module {
@@ -36,21 +38,28 @@ interface Module {
   summary: string | null;
   created_at: string;
   completed?: boolean;
+  start_page?: number | null;
+  end_page?: number | null;
+  content_excerpt?: string | null;
+}
+
+interface StudyMaterial {
+  id: string;
+  module_id: string;
+  type: 'flashcards' | 'quiz' | 'summary';
+  payload: any;
+  generated_at: string | null;
 }
 
 interface Flashcard {
-  id: string;
   question: string;
   answer: string;
-  module_id?: string | null;
 }
 
-interface Quiz {
-  id: string;
-  question: string;
-  options: string[];
+interface QuizQuestion {
+  stem: string;
+  choices: string[];
   correct: string;
-  module_id?: string | null;
 }
 
 interface FlashcardGeneratorProps {
@@ -62,12 +71,11 @@ export default function FlashcardGenerator({
   document,
   selectedModule = null,
 }: FlashcardGeneratorProps) {
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [studyMaterials, setStudyMaterials] = useState<Record<string, StudyMaterial>>({});
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState({
     question: "",
@@ -77,70 +85,39 @@ export default function FlashcardGenerator({
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [quizScore, setQuizScore] = useState({ correct: 0, total: 0 });
-  const [moduleSummary, setModuleSummary] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    if (document && document.status === "completed") {
-      setLoading(true);
-      fetchStudyContent();
+    if (selectedModule) {
+      fetchStudyMaterials();
     } else {
-      setFlashcards([]);
-      setQuizzes([]);
-      setModuleSummary(null);
+      setStudyMaterials({});
+      setError(null);
     }
-  }, [document, selectedModule]);
+  }, [selectedModule]);
 
-  const fetchStudyContent = async () => {
-    if (!document) return;
+  const fetchStudyMaterials = async () => {
+    if (!selectedModule) return;
 
     try {
-      // Set module summary if a module is selected
-      if (selectedModule) {
-        setModuleSummary(selectedModule.summary);
-      } else {
-        setModuleSummary(null);
+      const response = await fetch(`/api/modules/${selectedModule.id}/materials`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch study materials');
       }
 
-      // Fetch flashcards - filter by module if selected
-      let flashcardsQuery = supabase
-        .from("flashcards")
-        .select("*")
-        .eq("document_id", document.id);
-
-      if (selectedModule) {
-        flashcardsQuery = flashcardsQuery.eq("module_id", selectedModule.id);
-      } else {
-        // If no module is selected, only get flashcards without a module_id
-        // This maintains backward compatibility with older documents
-        flashcardsQuery = flashcardsQuery.is("module_id", null);
+      // Convert array to object keyed by type
+      const materialsMap: Record<string, StudyMaterial> = {};
+      if (result.materials) {
+        result.materials.forEach((material: StudyMaterial) => {
+          materialsMap[material.type] = material;
+        });
       }
 
-      const { data: flashcardsData, error: flashcardsError } =
-        await flashcardsQuery;
-
-      if (flashcardsError) throw flashcardsError;
-
-      // Fetch quizzes - filter by module if selected
-      let quizzesQuery = supabase
-        .from("quizzes")
-        .select("*")
-        .eq("document_id", document.id);
-
-      if (selectedModule) {
-        quizzesQuery = quizzesQuery.eq("module_id", selectedModule.id);
-      } else {
-        // If no module is selected, only get quizzes without a module_id
-        quizzesQuery = quizzesQuery.is("module_id", null);
-      }
-
-      const { data: quizzesData, error: quizzesError } = await quizzesQuery;
-
-      if (quizzesError) throw quizzesError;
-
-      setFlashcards(flashcardsData || []);
-      setQuizzes(quizzesData || []);
+      setStudyMaterials(materialsMap);
       setCurrentFlashcardIndex(0);
       setCurrentQuizIndex(0);
       setFlipped(false);
@@ -148,9 +125,57 @@ export default function FlashcardGenerator({
       setShowAnswer(false);
       setQuizScore({ correct: 0, total: 0 });
     } catch (error) {
-      console.error("Error fetching study content:", error);
+      console.error("Error fetching study materials:", error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch study materials');
+    }
+  };
+
+  const generateStudyMaterial = async (type: 'flashcards' | 'quiz' | 'summary', options: any = {}) => {
+    if (!selectedModule) return;
+
+    try {
+      setLoading(prev => ({ ...prev, [type]: true }));
+      setError(null);
+
+      const response = await fetch(`/api/modules/${selectedModule.id}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type,
+          options,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to generate ${type}`);
+      }
+
+      // Update the study materials state
+      setStudyMaterials(prev => ({
+        ...prev,
+        [type]: result.data,
+      }));
+
+      // Reset indices and states
+      if (type === 'flashcards') {
+        setCurrentFlashcardIndex(0);
+        setFlipped(false);
+      } else if (type === 'quiz') {
+        setCurrentQuizIndex(0);
+        setSelectedAnswer(null);
+        setShowAnswer(false);
+        setQuizScore({ correct: 0, total: 0 });
+      }
+
+    } catch (error) {
+      console.error(`Error generating ${type}:`, error);
+      setError(error instanceof Error ? error.message : `Failed to generate ${type}`);
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, [type]: false }));
     }
   };
 
@@ -159,6 +184,7 @@ export default function FlashcardGenerator({
   };
 
   const handleNextFlashcard = () => {
+    const flashcards = studyMaterials.flashcards?.payload?.flashcards || [];
     if (currentFlashcardIndex < flashcards.length - 1) {
       setCurrentFlashcardIndex(currentFlashcardIndex + 1);
       setFlipped(false);
@@ -172,59 +198,12 @@ export default function FlashcardGenerator({
     }
   };
 
-  const handleEdit = () => {
-    if (flashcards.length > 0) {
-      setEditedContent({
-        question: flashcards[currentFlashcardIndex].question,
-        answer: flashcards[currentFlashcardIndex].answer,
-      });
-      setEditing(true);
-    }
-  };
-
-  const handleSave = async () => {
-    if (flashcards.length > 0) {
-      try {
-        const flashcardId = flashcards[currentFlashcardIndex].id;
-
-        // Update in Supabase
-        const { error } = await supabase
-          .from("flashcards")
-          .update({
-            question: editedContent.question,
-            answer: editedContent.answer,
-          })
-          .eq("id", flashcardId);
-
-        if (error) throw error;
-
-        // Update local state
-        const updatedFlashcards = [...flashcards];
-        updatedFlashcards[currentFlashcardIndex] = {
-          ...updatedFlashcards[currentFlashcardIndex],
-          question: editedContent.question,
-          answer: editedContent.answer,
-        };
-        setFlashcards(updatedFlashcards);
-        setEditing(false);
-      } catch (error) {
-        console.error("Error updating flashcard:", error);
-      }
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditing(false);
-  };
-
   const handleNextQuiz = () => {
-    if (currentQuizIndex < quizzes.length - 1) {
+    const questions = studyMaterials.quiz?.payload?.questions || [];
+    if (currentQuizIndex < questions.length - 1) {
       setCurrentQuizIndex(currentQuizIndex + 1);
       setSelectedAnswer(null);
       setShowAnswer(false);
-    } else {
-      // End of quiz
-      setShowAnswer(true);
     }
   };
 
@@ -237,22 +216,19 @@ export default function FlashcardGenerator({
   };
 
   const handleAnswerSelect = (answer: string) => {
-    if (!showAnswer) {
-      setSelectedAnswer(answer);
-    }
+    setSelectedAnswer(answer);
   };
 
   const handleCheckAnswer = () => {
-    if (selectedAnswer && quizzes.length > 0) {
-      const currentQuiz = quizzes[currentQuizIndex];
-      const isCorrect = selectedAnswer === currentQuiz.correct;
-
-      setQuizScore((prev) => ({
-        correct: isCorrect ? prev.correct + 1 : prev.correct,
-        total: prev.total + 1,
-      }));
-
+    const questions = studyMaterials.quiz?.payload?.questions || [];
+    const currentQuestion = questions[currentQuizIndex];
+    if (selectedAnswer && currentQuestion) {
       setShowAnswer(true);
+      if (selectedAnswer === currentQuestion.correct) {
+        setQuizScore(prev => ({ ...prev, correct: prev.correct + 1, total: prev.total + 1 }));
+      } else {
+        setQuizScore(prev => ({ ...prev, total: prev.total + 1 }));
+      }
     }
   };
 
@@ -265,344 +241,333 @@ export default function FlashcardGenerator({
 
   if (!document) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-50 rounded-lg">
-        <div className="mb-4">
-          <svg
-            className="h-16 w-16 text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <BookOpen className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No document selected
+          </h3>
+          <p className="text-sm text-gray-500">
+            Please select a document to generate study materials.
+          </p>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No document selected
-        </h3>
-        <p className="text-sm text-gray-500">
-          Select a document from the list to view flashcards and quizzes.
-        </p>
       </div>
     );
   }
 
-  if (document.status === "processing") {
+  if (!selectedModule) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-white rounded-lg">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          Processing Document
-        </h3>
-        <p className="text-sm text-gray-500">
-          We're analyzing {document.file_name} to create your study materials.
-        </p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-white rounded-lg">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          Loading Study Materials
-        </h3>
-        <p className="text-sm text-gray-500">This will just take a moment...</p>
-      </div>
-    );
-  }
-
-  if (flashcards.length === 0 && quizzes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-white rounded-lg">
-        <div className="mb-4">
-          <Brain className="h-16 w-16 text-gray-300" />
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Sparkles className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            Select a module to generate materials
+          </h3>
+          <p className="text-sm text-gray-500">
+            Choose a module from the sidebar to generate flashcards, quizzes, or summaries.
+          </p>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No study materials available
-        </h3>
-        <p className="text-sm text-gray-500 mb-4">
-          {selectedModule
-            ? `No study materials found for module "${selectedModule.title}".`
-            : "There was an issue generating study materials for this document."}
-        </p>
-        <Button onClick={fetchStudyContent}>Retry</Button>
       </div>
     );
   }
+
+  const flashcards = studyMaterials.flashcards?.payload?.flashcards || [];
+  const questions = studyMaterials.quiz?.payload?.questions || [];
+  const summary = studyMaterials.summary?.payload?.summary || "";
 
   return (
     <div className="h-full flex flex-col">
-      {/* Module Summary Section */}
-      {moduleSummary && (
-        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-5 w-5 text-blue-600" />
-            <h3 className="font-medium text-blue-800">
-              {selectedModule?.title || "Module Summary"}
-            </h3>
-          </div>
-          <p className="text-sm text-blue-700">{moduleSummary}</p>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Study Materials</h2>
+        <div className="bg-blue-50 p-3 rounded-lg">
+          <h3 className="font-medium text-blue-900">{selectedModule.title}</h3>
+          {selectedModule.summary && (
+            <p className="text-sm text-blue-700 mt-1">{selectedModule.summary}</p>
+          )}
+          {(selectedModule.start_page || selectedModule.end_page) && (
+            <p className="text-xs text-blue-600 mt-1">
+              Pages: {selectedModule.start_page || "?"} - {selectedModule.end_page || "?"}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          {error}
         </div>
       )}
 
-      {/* Generate Flashcards Button */}
-      {document && document.status === "completed" && (
-        <div className="mb-4">
-          <Button 
-            onClick={() => setShowGenerateModal(true)} 
-            className="w-full flex items-center justify-center gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            Generate AI Flashcards
-          </Button>
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+          <TabsTrigger value="quiz">Quiz</TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+        </TabsList>
 
-      <div className="mb-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="flashcards">
-              Flashcards ({flashcards.length})
-            </TabsTrigger>
-            <TabsTrigger value="quiz">Quiz ({quizzes.length})</TabsTrigger>
-          </TabsList>
-
-          {/* Flashcards Tab */}
-          <TabsContent value="flashcards" className="mt-4">
-            {flashcards.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[300px] p-6 text-center bg-gray-50 rounded-lg">
-                <div className="mb-4">
-                  <Brain className="h-12 w-12 text-gray-300" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">
-                  No flashcards available
+        <TabsContent value="flashcards" className="flex-1 mt-4">
+          {flashcards.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Brain className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No flashcards generated yet
                 </h3>
-                <p className="text-sm text-gray-500">
-                  No flashcards were generated for this document.
+                <p className="text-sm text-gray-500 mb-4">
+                  Generate AI-powered flashcards for this module.
                 </p>
-              </div>
-            ) : editing ? (
-              <div className="flex flex-col h-[400px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">Edit Flashcard</h3>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCancelEdit}
-                    >
-                      <X className="h-4 w-4 mr-1" /> Cancel
-                    </Button>
-                    <Button size="sm" onClick={handleSave}>
-                      <Save className="h-4 w-4 mr-1" /> Save
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-                  <div className="flex flex-col">
-                    <Label className="text-sm font-medium mb-2">Question</Label>
-                    <Textarea
-                      className="flex-1 resize-none"
-                      value={editedContent.question}
-                      onChange={(e) =>
-                        setEditedContent({
-                          ...editedContent,
-                          question: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <Label className="text-sm font-medium mb-2">Answer</Label>
-                    <Textarea
-                      className="flex-1 resize-none"
-                      value={editedContent.answer}
-                      onChange={(e) =>
-                        setEditedContent({
-                          ...editedContent,
-                          answer: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">
-                    Flashcard {currentFlashcardIndex + 1} of {flashcards.length}
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={handleEdit}>
-                    <Edit className="h-4 w-4 mr-1" /> Edit
-                  </Button>
-                </div>
-                <div
-                  className="relative h-[300px] w-full cursor-pointer"
-                  onClick={handleFlip}
+                <Button
+                  onClick={() => generateStudyMaterial('flashcards', { num_cards: 5 })}
+                  disabled={loading.flashcards}
+                  className="flex items-center gap-2"
                 >
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center p-6 rounded-lg shadow-md bg-white transition-all duration-300 ${flipped ? "opacity-0 rotate-y-180 pointer-events-none" : "opacity-100"}`}
-                  >
-                    <div className="text-center">
-                      <p className="text-xl">
-                        {flashcards[currentFlashcardIndex]?.question}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-4">
-                        Click to reveal answer
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center p-6 rounded-lg shadow-md bg-blue-50 transition-all duration-300 ${flipped ? "opacity-100" : "opacity-0 rotate-y-180 pointer-events-none"}`}
-                  >
-                    <div className="text-center">
-                      <p className="text-xl">
-                        {flashcards[currentFlashcardIndex]?.answer}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-4">
-                        Click to see question
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-between mt-6">
-                  <Button
-                    variant="outline"
-                    onClick={handlePreviousFlashcard}
-                    disabled={currentFlashcardIndex === 0}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                  </Button>
-                  <Button
-                    onClick={handleNextFlashcard}
-                    disabled={currentFlashcardIndex === flashcards.length - 1}
-                  >
-                    Next <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </>
-            )}
-          </TabsContent>
+                  <Brain className="h-4 w-4" />
+                  {loading.flashcards ? "Generating..." : "Generate Flashcards"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">
+                  {currentFlashcardIndex + 1} of {flashcards.length}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => generateStudyMaterial('flashcards', { num_cards: 5 })}
+                  disabled={loading.flashcards}
+                  className="flex items-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  {loading.flashcards ? "Generating..." : "Regenerate"}
+                </Button>
+              </div>
 
-          {/* Quiz Tab */}
-          <TabsContent value="quiz" className="mt-4">
-            {quizzes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[300px] p-6 text-center bg-gray-50 rounded-lg">
-                <div className="mb-4">
-                  <Brain className="h-12 w-12 text-gray-300" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">
-                  No quizzes available
+              <Card className="min-h-[300px] cursor-pointer" onClick={handleFlip}>
+                <CardContent className="p-8 flex items-center justify-center text-center h-full">
+                  <div className="w-full">
+                    <h3 className="text-lg font-medium mb-4">
+                      {flipped ? "Answer" : "Question"}
+                    </h3>
+                    <p className="text-base leading-relaxed">
+                      {flipped
+                        ? flashcards[currentFlashcardIndex]?.answer
+                        : flashcards[currentFlashcardIndex]?.question}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-4">
+                      Click to {flipped ? "see question" : "reveal answer"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-between items-center">
+                <Button
+                  variant="outline"
+                  onClick={handlePreviousFlashcard}
+                  disabled={currentFlashcardIndex === 0}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleNextFlashcard}
+                  disabled={currentFlashcardIndex === flashcards.length - 1}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="quiz" className="flex-1 mt-4">
+          {questions.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Check className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No quiz generated yet
                 </h3>
-                <p className="text-sm text-gray-500">
-                  No quizzes were generated for this document.
+                <p className="text-sm text-gray-500 mb-4">
+                  Generate AI-powered quiz questions for this module.
                 </p>
+                <Button
+                  onClick={() => generateStudyMaterial('quiz', { num_questions: 5 })}
+                  disabled={loading.quiz}
+                  className="flex items-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  {loading.quiz ? "Generating..." : "Generate Quiz"}
+                </Button>
               </div>
-            ) : quizScore.total === quizzes.length && showAnswer ? (
-              // Quiz results
-              <div className="flex flex-col items-center justify-center h-[400px] p-6 text-center bg-white rounded-lg">
-                <div className="mb-4">
-                  <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-blue-600">
-                      {Math.round((quizScore.correct / quizScore.total) * 100)}%
-                    </span>
-                  </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    Question {currentQuizIndex + 1} of {questions.length}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Score: {quizScore.correct}/{quizScore.total}
+                  </span>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Quiz Complete!</h3>
-                <p className="text-lg mb-4">
-                  You got {quizScore.correct} out of {quizScore.total} questions
-                  correct
-                </p>
-                <Button onClick={resetQuiz}>Restart Quiz</Button>
-              </div>
-            ) : (
-              // Quiz questions
-              <div className="flex flex-col h-[400px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">
-                    Question {currentQuizIndex + 1} of {quizzes.length}
-                  </h3>
-                </div>
-
-                <Card className="mb-4 flex-1">
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      {quizzes[currentQuizIndex]?.question}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RadioGroup
-                      value={selectedAnswer || ""}
-                      onValueChange={handleAnswerSelect}
-                      className="space-y-3"
-                      disabled={showAnswer}
-                    >
-                      {quizzes[currentQuizIndex]?.options.map(
-                        (option, index) => (
-                          <div
-                            key={index}
-                            className={`flex items-center space-x-2 rounded-md border p-3 ${showAnswer && option === quizzes[currentQuizIndex].correct ? "bg-green-50 border-green-200" : ""} ${showAnswer && selectedAnswer === option && option !== quizzes[currentQuizIndex].correct ? "bg-red-50 border-red-200" : ""}`}
-                          >
-                            <RadioGroupItem
-                              value={option}
-                              id={`option-${index}`}
-                            />
-                            <Label
-                              htmlFor={`option-${index}`}
-                              className="flex-1"
-                            >
-                              {option}
-                            </Label>
-                            {showAnswer &&
-                              option === quizzes[currentQuizIndex].correct && (
-                                <Check className="h-4 w-4 text-green-500" />
-                              )}
-                          </div>
-                        ),
-                      )}
-                    </RadioGroup>
-                  </CardContent>
-                </Card>
-
-                <div className="flex justify-between mt-auto">
+                <div className="flex gap-2">
                   <Button
+                    size="sm"
                     variant="outline"
-                    onClick={handlePreviousQuiz}
-                    disabled={currentQuizIndex === 0}
+                    onClick={resetQuiz}
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                    Reset
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateStudyMaterial('quiz', { num_questions: 5 })}
+                    disabled={loading.quiz}
+                    className="flex items-center gap-1"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    {loading.quiz ? "Generating..." : "Regenerate"}
+                  </Button>
+                </div>
+              </div>
 
-                  {showAnswer ? (
-                    <Button onClick={handleNextQuiz}>
-                      {currentQuizIndex === quizzes.length - 1
-                        ? "See Results"
-                        : "Next Question"}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    {questions[currentQuizIndex]?.stem}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={selectedAnswer || ""}
+                    onValueChange={handleAnswerSelect}
+                    disabled={showAnswer}
+                  >
+                    {questions[currentQuizIndex]?.choices.map((choice: string, index: number) => {
+                      const choiceLabel = String.fromCharCode(65 + index); // A, B, C, D
+                      const isCorrect = choiceLabel === questions[currentQuizIndex]?.correct;
+                      const isSelected = selectedAnswer === choiceLabel;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center space-x-2 p-2 rounded ${
+                            showAnswer
+                              ? isCorrect
+                                ? "bg-green-100 text-green-800"
+                                : isSelected
+                                ? "bg-red-100 text-red-800"
+                                : ""
+                              : ""
+                          }`}
+                        >
+                          <RadioGroupItem value={choiceLabel} id={choiceLabel} />
+                          <Label htmlFor={choiceLabel} className="flex-1 cursor-pointer">
+                            {choiceLabel}. {choice}
+                          </Label>
+                          {showAnswer && isCorrect && (
+                            <Check className="h-4 w-4 text-green-600" />
+                          )}
+                          {showAnswer && isSelected && !isCorrect && (
+                            <X className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </RadioGroup>
+
+                  <div className="mt-4 flex justify-between">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handlePreviousQuiz}
+                        disabled={currentQuizIndex === 0}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleNextQuiz}
+                        disabled={currentQuizIndex === questions.length - 1}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+
                     <Button
                       onClick={handleCheckAnswer}
-                      disabled={!selectedAnswer}
+                      disabled={!selectedAnswer || showAnswer}
                     >
                       Check Answer
                     </Button>
-                  )}
-                </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="summary" className="flex-1 mt-4">
+          {!summary ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <BookOpen className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No summary generated yet
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Generate an AI-powered summary for this module.
+                </p>
+                <Button
+                  onClick={() => generateStudyMaterial('summary')}
+                  disabled={loading.summary}
+                  className="flex items-center gap-2"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {loading.summary ? "Generating..." : "Generate Summary"}
+                </Button>
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => generateStudyMaterial('summary')}
+                  disabled={loading.summary}
+                  className="flex items-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  {loading.summary ? "Generating..." : "Regenerate"}
+                </Button>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Module Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-sm max-w-none">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {summary}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Generate Flashcards Modal */}
       <GenerateFlashcardsModal
@@ -610,8 +575,18 @@ export default function FlashcardGenerator({
         onClose={() => setShowGenerateModal(false)}
         document={document}
         folderId={document?.folder_id || null}
-        onGenerationComplete={fetchStudyContent}
+        onGenerationComplete={fetchStudyMaterials}
       />
     </div>
+  );
+}
+
+function CheckIcon(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 12 2 2 4-4"/>
+      <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+      <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+    </svg>
   );
 }

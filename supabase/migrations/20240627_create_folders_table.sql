@@ -39,5 +39,17 @@ CREATE POLICY "Users can delete their own folders"
   ON folders FOR DELETE
   USING (auth.uid() = user_id);
 
--- Enable realtime for folders
-alter publication supabase_realtime add table folders;
+-- Enable realtime for folders, but only if it’s not already there
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_publication_rel pr
+      JOIN pg_publication p ON p.oid = pr.prpubid
+     WHERE p.pubname = 'supabase_realtime'
+       AND pr.prrelid = 'folders'::regclass
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE folders';
+  END IF;
+END
+$$;

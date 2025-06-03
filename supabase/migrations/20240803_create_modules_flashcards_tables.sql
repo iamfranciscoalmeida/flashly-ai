@@ -122,7 +122,47 @@ CREATE POLICY "Users can delete their own quizzes"
   ON quizzes FOR DELETE
   USING (auth.uid() = user_id);
 
--- Enable realtime for all tables
-alter publication supabase_realtime add table modules;
-alter publication supabase_realtime add table flashcards;
-alter publication supabase_realtime add table quizzes;
+-- Enable realtime for modules (only if not already added)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_publication_rel pr
+      JOIN pg_publication p ON p.oid = pr.prpubid
+     WHERE p.pubname = 'supabase_realtime'
+       AND pr.prrelid = 'modules'::regclass
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE modules';
+  END IF;
+END
+$$;
+
+-- Enable realtime for flashcards (only if not already added)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_publication_rel pr
+      JOIN pg_publication p ON p.oid = pr.prpubid
+     WHERE p.pubname = 'supabase_realtime'
+       AND pr.prrelid = 'flashcards'::regclass
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE flashcards';
+  END IF;
+END
+$$;
+
+-- Enable realtime for quizzes (only if not already added)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_publication_rel pr
+      JOIN pg_publication p ON p.oid = pr.prpubid
+     WHERE p.pubname = 'supabase_realtime'
+       AND pr.prrelid = 'quizzes'::regclass
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE quizzes';
+  END IF;
+END
+$$;

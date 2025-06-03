@@ -12,6 +12,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Upload, Layers } from "lucide-react";
 import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Plus, Search, Youtube, FileText, Clock, BookOpen, Brain } from 'lucide-react';
+import { StudySession } from '@/types/study-session';
+import SessionCreator from '@/components/study/session-creator';
+import StudyInterface from '@/components/study/study-interface';
 
 interface Document {
   id: string;
@@ -31,194 +38,253 @@ interface Module {
   completed?: boolean;
 }
 
-export default function StudyDashboard() {
-  const [view, setView] = useState<"split" | "full">("split");
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(
-    null,
-  );
-  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showModules, setShowModules] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+export default function StudyPage() {
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCreator, setShowCreator] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/sign-in");
-        return;
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/study-sessions');
+      if (response.ok) {
+        const { sessions } = await response.json();
+        setSessions(sessions || []);
       }
-      setUser(user);
-      setLoading(false);
-    };
-
-    checkAuth();
-
-    // Check if mobile view
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-
-    handleResize(); // Initial check
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [supabase, router]);
-
-  const handleSelectDocument = (document: Document) => {
-    setSelectedDocument(document);
-    setSelectedModule(null); // Clear module selection when changing documents
-    setShowModules(true); // Show modules when a document is selected
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSelectModule = (module: Module) => {
-    setSelectedModule(module);
+  const handleSessionCreated = (sessionId: string) => {
+    setShowCreator(false);
+    setActiveSessionId(sessionId);
+    loadSessions(); // Refresh the list
   };
 
-  const handleSelectFolder = (folderId: string | null) => {
-    setSelectedFolderId(folderId);
-    setSelectedDocument(null); // Clear document selection when changing folders
-    setSelectedModule(null); // Clear module selection when changing folders
-    setShowModules(false); // Hide modules when changing folders
+  const handleSessionSelect = (sessionId: string) => {
+    setActiveSessionId(sessionId);
   };
 
-  const handleViewChange = (newView: "split" | "full") => {
-    setView(newView);
+  const handleBackToList = () => {
+    setActiveSessionId(null);
+    loadSessions(); // Refresh when returning to list
   };
 
-  const toggleModuleView = () => {
-    setShowModules(!showModules);
+  const getSourceIcon = (sourceType: string) => {
+    switch (sourceType) {
+      case 'youtube':
+        return <Youtube className="h-4 w-4" />;
+      case 'text':
+        return <FileText className="h-4 w-4" />;
+      case 'document':
+      case 'pdf':
+        return <Upload className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
   };
 
-  if (loading) {
+  const filteredSessions = sessions.filter(session =>
+    session.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    session.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    session.topic?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // If viewing a specific session
+  if (activeSessionId) {
+    return <StudyInterface sessionId={activeSessionId} onBack={handleBackToList} />;
+  }
+
+  // If showing session creator
+  if (showCreator) {
     return (
       <div className="min-h-screen bg-background">
         <DashboardNavbar />
-        <div className="container mx-auto px-4 py-8 flex items-center justify-center h-[calc(100vh-80px)]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="container mx-auto p-8">
+          <SessionCreator
+            onSessionCreated={handleSessionCreated}
+            onClose={() => setShowCreator(false)}
+          />
         </div>
       </div>
     );
   }
 
+  // Main sessions list view
   return (
     <div className="min-h-screen bg-background">
       <DashboardNavbar />
-      <main className="container mx-auto px-4 py-8">
-        {/* Header with view toggle */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+      <div className="container mx-auto p-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">Study Dashboard</h1>
-            <p className="text-muted-foreground">
-              Generate and review your study materials
+            <h1 className="text-3xl font-bold">Study Sessions</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your AI-powered study sessions
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <DashboardViewToggle view={view} onViewChange={handleViewChange} />
-            <Link href="/dashboard/upload">
-              <Button size="sm" className="flex items-center gap-1">
-                <Upload className="h-4 w-4" />
-                <span>Upload</span>
-              </Button>
-            </Link>
-          </div>
+          <Button onClick={() => setShowCreator(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Session
+          </Button>
         </div>
 
-        {/* Main content area with conditional layout */}
-        <div
-          className={`grid ${view === "split" ? "grid-cols-1 lg:grid-cols-3 gap-6" : "grid-cols-1"}`}
-        >
-          {/* Document list and folders (hidden in full view) */}
-          {view === "split" && (
-            <div className="lg:col-span-1 bg-card rounded-lg border p-4 h-[calc(100vh-200px)] overflow-hidden flex flex-col">
-              {/* Mobile folder dropdown */}
-              {isMobile && (
-                <FolderSidebar
-                  onSelectFolder={handleSelectFolder}
-                  selectedFolderId={selectedFolderId}
-                  isMobile={true}
-                  className="mb-4"
-                />
-              )}
-
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {/* Desktop folder sidebar */}
-                {!isMobile && (
-                  <FolderSidebar
-                    onSelectFolder={handleSelectFolder}
-                    selectedFolderId={selectedFolderId}
-                    className="mb-4"
-                  />
-                )}
-
-                {/* Toggle between documents and modules */}
-                {selectedDocument && (
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">
-                      {showModules
-                        ? "Modules"
-                        : selectedFolderId
-                          ? "Folder Documents"
-                          : "All Files"}
-                    </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={toggleModuleView}
-                      className="flex items-center gap-1"
-                    >
-                      <Layers className="h-4 w-4" />
-                      <span>
-                        {showModules ? "Show Documents" : "Show Modules"}
-                      </span>
-                    </Button>
-                  </div>
-                )}
-
-                {!selectedDocument || !showModules ? (
-                  // Show document list when no document is selected or modules view is not active
-                  <>
-                    {!selectedDocument && (
-                      <h2 className="text-lg font-semibold mb-4">
-                        {selectedFolderId ? "Folder Documents" : "All Files"}
-                      </h2>
-                    )}
-                    <DocumentList
-                      onSelectDocument={handleSelectDocument}
-                      selectedFolderId={selectedFolderId}
-                    />
-                  </>
-                ) : (
-                  // Show module list when a document is selected and modules view is active
-                  <ModuleList
-                    documentId={selectedDocument.id}
-                    onSelectModule={handleSelectModule}
-                    selectedModuleId={selectedModule?.id || null}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Flashcard/Quiz area */}
-          <div
-            className={`${view === "split" ? "lg:col-span-2" : ""} bg-card rounded-lg border p-6 h-[calc(100vh-200px)] overflow-auto`}
-          >
-            <FlashcardGenerator
-              document={selectedDocument}
-              selectedModule={selectedModule}
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search sessions by title, subject, or topic..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
           </div>
         </div>
-      </main>
+
+        {/* Sessions Grid */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading sessions...</p>
+            </div>
+          </div>
+        ) : filteredSessions.length === 0 ? (
+          <div className="text-center py-12">
+            {sessions.length === 0 ? (
+              <div>
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Study Sessions Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first study session to get started with AI-powered learning.
+                </p>
+                <Button onClick={() => setShowCreator(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Session
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Sessions Found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search terms or create a new session.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSessions.map((session) => (
+              <Card
+                key={session.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleSessionSelect(session.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      {getSourceIcon(session.source_type)}
+                      <CardTitle className="text-lg line-clamp-2">
+                        {session.title}
+                      </CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* Labels */}
+                    <div className="flex flex-wrap gap-2">
+                      {session.subject && (
+                        <Badge variant="secondary">{session.subject}</Badge>
+                      )}
+                      {session.topic && (
+                        <Badge variant="outline">{session.topic}</Badge>
+                      )}
+                      {session.level && (
+                        <Badge variant="outline">{session.level}</Badge>
+                      )}
+                    </div>
+
+                    {/* Content preview */}
+                    {session.content_text && (
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {session.content_text.substring(0, 150)}...
+                      </p>
+                    )}
+
+                    {/* Metadata */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {session.source_type}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Quick Stats */}
+        {sessions.length > 0 && (
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="h-8 w-8 text-blue-500" />
+                  <div>
+                    <p className="text-2xl font-bold">{sessions.length}</p>
+                    <p className="text-sm text-muted-foreground">Total Sessions</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Brain className="h-8 w-8 text-green-500" />
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {new Set(sessions.map(s => s.subject).filter(Boolean)).size}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Subjects</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Youtube className="h-8 w-8 text-red-500" />
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {sessions.filter(s => s.source_type === 'youtube').length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Video Sessions</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

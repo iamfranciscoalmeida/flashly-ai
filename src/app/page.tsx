@@ -253,7 +253,7 @@ export default async function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="/sign-up"
-              className="inline-flex items-center px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
             >
               Get Started Free
               <ArrowUpRight className="ml-2 w-4 h-4" />

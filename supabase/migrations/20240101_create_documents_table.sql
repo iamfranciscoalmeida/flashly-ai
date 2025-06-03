@@ -11,5 +11,3 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 
 CREATE INDEX IF NOT EXISTS documents_user_id_idx ON documents(user_id);
-
-alter publication supabase_realtime add table documents;

@@ -34,7 +34,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center px-8 py-4 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium"
+                className="inline-flex items-center px-8 py-4 text-white bg-black rounded-lg hover:bg-gray-800 transition-colors text-lg font-medium"
               >
                 Get Started Free
                 <ArrowUpRight className="ml-2 w-5 h-5" />
