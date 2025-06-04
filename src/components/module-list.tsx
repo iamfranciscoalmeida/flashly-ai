@@ -104,25 +104,29 @@ export default function ModuleList({
           filter: `document_id=eq.${documentId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT") {
+          // Type the payload data properly
+          const newModule = payload.new as Module | null;
+          const oldModule = payload.old as Module | null;
+          
+          if (payload.eventType === "INSERT" && newModule) {
             setModules((prev) =>
-              [...prev, payload.new as Module].sort(
+              [...prev, newModule].sort(
                 (a, b) => a.order - b.order,
               ),
             );
-          } else if (payload.eventType === "UPDATE") {
+          } else if (payload.eventType === "UPDATE" && newModule) {
             setModules((prev) =>
               prev
                 .map((module) =>
-                  module.id === payload.new.id
-                    ? (payload.new as Module)
+                  module.id === newModule.id
+                    ? newModule
                     : module,
                 )
                 .sort((a, b) => a.order - b.order),
             );
-          } else if (payload.eventType === "DELETE") {
+          } else if (payload.eventType === "DELETE" && oldModule) {
             setModules((prev) =>
-              prev.filter((module) => module.id !== payload.old.id),
+              prev.filter((module) => module.id !== oldModule.id),
             );
           }
         },

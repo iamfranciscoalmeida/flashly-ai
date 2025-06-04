@@ -25,6 +25,10 @@ interface FolderData {
   created_at: string;
 }
 
+interface FolderDataWithCount extends FolderData {
+  documentCount?: number;
+}
+
 interface FolderSidebarProps {
   onSelectFolder: (folderId: string | null) => void;
   selectedFolderId: string | null;
@@ -45,7 +49,7 @@ export default function FolderSidebar({
   const [showDeleteFolderDialog, setShowDeleteFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [editingFolder, setEditingFolder] = useState<FolderData | null>(null);
-  const [deletingFolder, setDeletingFolder] = useState<FolderData | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<FolderDataWithCount | null>(null);
   const [isPremium, setIsPremium] = useState<boolean | null>(null);
   const [folderCount, setFolderCount] = useState(0);
   const [showUpsellDialog, setShowUpsellDialog] = useState(false);
@@ -89,21 +93,25 @@ export default function FolderSidebar({
         "postgres_changes",
         { event: "*", schema: "public", table: "folders" },
         (payload) => {
+          // Type the payload data properly
+          const newFolder = payload.new as FolderData | null;
+          const oldFolder = payload.old as FolderData | null;
+          
           // Handle different types of changes
-          if (payload.eventType === "INSERT") {
-            setFolders((prev) => [payload.new as FolderData, ...prev]);
+          if (payload.eventType === "INSERT" && newFolder) {
+            setFolders((prev) => [newFolder, ...prev]);
             setFolderCount((prev) => prev + 1);
-          } else if (payload.eventType === "UPDATE") {
+          } else if (payload.eventType === "UPDATE" && newFolder) {
             setFolders((prev) =>
               prev.map((folder) =>
-                folder.id === payload.new.id
-                  ? (payload.new as FolderData)
+                folder.id === newFolder.id
+                  ? newFolder
                   : folder,
               ),
             );
-          } else if (payload.eventType === "DELETE") {
+          } else if (payload.eventType === "DELETE" && oldFolder) {
             setFolders((prev) =>
-              prev.filter((folder) => folder.id !== payload.old.id),
+              prev.filter((folder) => folder.id !== oldFolder.id),
             );
             setFolderCount((prev) => prev - 1);
           }
@@ -482,10 +490,10 @@ export default function FolderSidebar({
                 Are you sure you want to delete the folder "
                 {deletingFolder?.name}"?
               </p>
-              {deletingFolder?.documentCount > 0 && (
+              {deletingFolder && (deletingFolder.documentCount ?? 0) > 0 && (
                 <p className="mt-2 text-amber-600">
                   This folder contains {deletingFolder.documentCount} document
-                  {deletingFolder.documentCount !== 1 ? "s" : ""}. They will be
+                  {(deletingFolder.documentCount ?? 0) !== 1 ? "s" : ""}. They will be
                   moved to "All Files".
                 </p>
               )}
