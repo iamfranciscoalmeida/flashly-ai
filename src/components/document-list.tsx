@@ -123,7 +123,7 @@ export default function DocumentList({
         "postgres_changes",
         { event: "*", schema: "public", table: "documents" },
         (payload) => {
-          // Type the payload data properly
+          // Type the payload data properly - Fix for TypeScript compilation
           const newDoc = payload.new as Document | null;
           const oldDoc = payload.old as Document | null;
           
