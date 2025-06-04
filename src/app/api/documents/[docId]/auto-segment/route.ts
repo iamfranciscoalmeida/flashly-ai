@@ -1,7 +1,7 @@
 import { createClient } from "../../../../../../supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from 'openai';
-import pdfParse from 'pdf-parse';
+// Dynamic import of pdf-parse to avoid build-time test file issues
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -391,6 +391,7 @@ async function extractTextFromDocument(fileUrl: string): Promise<string> {
     
     // Extract text using pdf-parse
     console.log('Extracting text from PDF using pdf-parse...');
+    const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
     
     if (!data.text || data.text.trim().length === 0) {
