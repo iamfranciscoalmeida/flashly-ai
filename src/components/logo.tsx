@@ -5,7 +5,7 @@ interface LogoProps {
   className?: string;
 }
 
-export default function Logo({ size = 32, className = "" }: LogoProps) {
+export default function Logo({ size = 48, className = "" }: LogoProps) {
   return (
     <Image 
       src="/logo.png" 

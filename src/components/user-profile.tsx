@@ -80,7 +80,7 @@ export default function UserProfile() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{userEmail}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {isPremium ? "Premium Plan" : "Free Plan"}
+              {isPremium ? "Pro Plan" : "Free Plan"}
             </p>
           </div>
         </DropdownMenuLabel>

@@ -15,19 +15,17 @@ const planLimits = {
     storage_mb: 100,
   },
   pro: {
-    uploads: 10,
+    uploads: 25,
     folders: 10,
     storage_mb: 2048, // 2 GB
   },
-  ultra: {
+  custom: {
     uploads: "unlimited",
     folders: "unlimited",
-    storage_mb: 5120, // 5 GB
-  },
-  school: {
-    uploads: "unlimited",
-    folders: "unlimited",
-    storage_mb: 10240, // 10 GB per seat
+    storage_mb: 20480, // 20 GB for enterprises/schools
+    sharing: true,
+    team_features: true,
+    admin_dashboard: true,
   },
 };
 
@@ -73,19 +71,14 @@ serve(async (req) => {
     let periodEnd = null;
 
     if (subscription) {
-      // Check if it's a pro or ultra plan based on price or metadata
+      // Check if it's a pro or custom plan based on price or metadata
       if (
-        subscription.stripe_price_id?.includes("ultra") ||
-        subscription.metadata?.plan === "ultra" ||
+        subscription.stripe_price_id?.includes("custom") ||
+        subscription.metadata?.plan === "custom" ||
         subscription.amount >= 1900
       ) {
         // $19 or more
-        plan = "ultra";
-      } else if (
-        subscription.stripe_price_id?.includes("school") ||
-        subscription.metadata?.plan === "school"
-      ) {
-        plan = "school";
+        plan = "custom";
       } else {
         plan = "pro";
       }

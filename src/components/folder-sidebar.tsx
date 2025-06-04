@@ -519,11 +519,11 @@ export default function FolderSidebar({
         <Dialog open={showUpsellDialog} onOpenChange={setShowUpsellDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upgrade to Premium</DialogTitle>
+              <DialogTitle>Upgrade to Pro</DialogTitle>
             </DialogHeader>
             <div className="py-4">
               <p>
-                Free accounts are limited to 2 folders. Upgrade to Premium for
+                Free accounts are limited to 2 folders. Upgrade to Pro for
                 unlimited folders and other benefits.
               </p>
             </div>

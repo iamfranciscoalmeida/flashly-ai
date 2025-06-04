@@ -1,7 +1,15 @@
 import Hero from "@/components/hero";
+import HeroWaitlist from "@/components/hero-waitlist";
 import Navbar from "@/components/navbar";
 import PricingCard from "@/components/pricing-card";
 import Footer from "@/components/footer";
+import UseCasesSection from "@/components/use-cases-section";
+import ProblemSolutionSection from "@/components/problem-solution-section";
+import WaitlistBenefitsSection from "@/components/waitlist-benefits-section";
+import ComparisonSection from "@/components/comparison-section";
+import RoadmapSection from "@/components/roadmap-section";
+import SocialProofSection from "@/components/social-proof-section";
+import EnhancedCtaFooter from "@/components/enhanced-cta-footer";
 import { createClient } from "../../supabase/server";
 import {
   ArrowUpRight,
@@ -18,6 +26,9 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Check if we're in waitlist mode
+  const isWaitlistMode = process.env.NEXT_PUBLIC_WAITLIST_MODE === 'true';
+
   // Redirect authenticated users to dashboard
   if (user) {
     return Response.redirect(
@@ -30,17 +41,27 @@ export default async function Home() {
     );
   }
 
-  const { data: plans, error } = await supabase.functions.invoke(
-    "supabase-functions-get-plans",
-  );
+  // Only fetch plans if not in waitlist mode
+  let plans = null;
+  if (!isWaitlistMode) {
+    const { data: plansData, error } = await supabase.functions.invoke(
+      "supabase-functions-get-plans",
+    );
+    plans = plansData;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       <Navbar />
-      <Hero />
+      
+      {/* Conditional Hero Section */}
+      {isWaitlistMode ? <HeroWaitlist /> : <Hero />}
+
+      {/* Use Cases Section - Show for all modes */}
+      <UseCasesSection />
 
       {/* Features Section */}
-      <section className="py-24 bg-white">
+      <section id="features" className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">
@@ -83,7 +104,7 @@ export default async function Home() {
                 key={index}
                 className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="text-blue-600 mb-4">{feature.icon}</div>
+                <div className="text-black mb-4">{feature.icon}</div>
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                 <p className="text-gray-600">{feature.description}</p>
               </div>
@@ -92,28 +113,31 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Problem-Solution Section */}
+      <ProblemSolutionSection />
+
       {/* Stats Section */}
-      <section className="py-20 bg-blue-600 text-white">
+      <section className="py-20 bg-black text-white">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div>
               <div className="text-4xl font-bold mb-2">10,000+</div>
-              <div className="text-blue-100">Students Helped</div>
+              <div className="text-gray-300">Students Helped</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2">50,000+</div>
-              <div className="text-blue-100">Flashcards Generated</div>
+              <div className="text-gray-300">Flashcards Generated</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2">95%</div>
-              <div className="text-blue-100">Improved Test Scores</div>
+              <div className="text-gray-300">Improved Test Scores</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="py-24 bg-white">
+      <section id="how-it-works" className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>
@@ -125,8 +149,8 @@ export default async function Home() {
 
           <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-blue-600 text-xl font-bold">1</span>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-black text-xl font-bold">1</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">
                 Upload Your Materials
@@ -137,8 +161,8 @@ export default async function Home() {
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-blue-600 text-xl font-bold">2</span>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-black text-xl font-bold">2</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">AI Processing</h3>
               <p className="text-gray-600">
@@ -147,8 +171,8 @@ export default async function Home() {
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-blue-600 text-xl font-bold">3</span>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-black text-xl font-bold">3</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">Study & Learn</h3>
               <p className="text-gray-600">
@@ -159,22 +183,33 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-24 bg-gray-50" id="pricing">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Choose Your Study Plan</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Select the plan that fits your study needs and goals
-            </p>
+      {/* Comparison Section - Show for all modes */}
+      <ComparisonSection />
+
+      {/* Waitlist Benefits Section - Only show in waitlist mode */}
+      {isWaitlistMode && <WaitlistBenefitsSection />}
+
+      {/* Conditional Pricing Section - Only show if not in waitlist mode */}
+      {!isWaitlistMode && (
+        <section id="pricing" className="py-24 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">Choose Your Study Plan</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Select the plan that fits your study needs and goals
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {plans?.map((item: any) => (
+                <PricingCard key={item.id} item={item} user={user} />
+              ))}
+            </div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {plans?.map((item: any) => (
-              <PricingCard key={item.id} item={item} user={user} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Roadmap Section - Show for all modes */}
+      <RoadmapSection />
 
       {/* Testimonials Section */}
       <section className="py-24 bg-white">
@@ -189,8 +224,8 @@ export default async function Home() {
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-blue-600 font-semibold">J</span>
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-black font-semibold">J</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Jamie L.</h4>
@@ -206,8 +241,8 @@ export default async function Home() {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-blue-600 font-semibold">M</span>
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-black font-semibold">M</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Michael T.</h4>
@@ -223,8 +258,8 @@ export default async function Home() {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-blue-600 font-semibold">S</span>
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-black font-semibold">S</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Sarah K.</h4>
@@ -241,32 +276,40 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to Transform Your Study Habits?
-          </h2>
-          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join thousands of students who are studying smarter, not harder.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="/sign-up"
-              className="inline-flex items-center px-6 py-3 text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Get Started Free
-              <ArrowUpRight className="ml-2 w-4 h-4" />
-            </a>
-            <a
-              href="#pricing"
-              className="inline-flex items-center px-6 py-3 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              View Plans
-            </a>
+      {/* Social Proof Section - Show for all modes */}
+      <SocialProofSection />
+
+      {/* Enhanced CTA Footer - Only show in waitlist mode */}
+      {isWaitlistMode && <EnhancedCtaFooter />}
+
+      {/* Conditional CTA Section - Only show if not in waitlist mode */}
+      {!isWaitlistMode && (
+        <section className="py-20 bg-gray-50">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="text-3xl font-bold mb-4">
+              Ready to Transform Your Study Habits?
+            </h2>
+            <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+              Join thousands of students who are studying smarter, not harder.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a
+                href="/sign-up"
+                className="inline-flex items-center px-6 py-3 text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Get Started Free
+                <ArrowUpRight className="ml-2 w-4 h-4" />
+              </a>
+              <a
+                href="#pricing"
+                className="inline-flex items-center px-6 py-3 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                View Plans
+              </a>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <Footer />
     </div>

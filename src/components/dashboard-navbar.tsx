@@ -32,9 +32,11 @@ export default function DashboardNavbar() {
     <nav className="w-full border-b border-gray-200 bg-white py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/" prefetch className="flex items-center">
-            <Logo className="mr-2" />
-            <span className="text-xl font-bold">StudyWithAI</span>
+          <Link href="/" prefetch className="flex items-center group">
+            <Logo className="mr-3 transition-transform duration-200 group-hover:scale-105" />
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              StudyWithAI
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-1">

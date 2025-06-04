@@ -56,6 +56,9 @@ export default function UploadPage() {
   const handleUploadAttempt = () => {
     if (!isPremium && documentCount >= 1) {
       setShowUpsell(true);
+    } else if (isPremium && documentCount >= 25) {
+      // Pro plan limit reached
+      alert("You've reached your Pro plan limit of 25 uploads per month.");
     }
   };
 
@@ -86,7 +89,7 @@ export default function UploadPage() {
             <h1 className="text-2xl font-bold">Upload Document</h1>
             <p className="text-muted-foreground mt-1">
               {isPremium
-                ? "Upload your study materials to generate flashcards and quizzes"
+                ? `Pro plan: ${documentCount}/25 uploads used this month`
                 : `Free plan: ${documentCount}/1 uploads used`}
             </p>
           </div>
@@ -150,7 +153,7 @@ export default function UploadPage() {
                       </h3>
                       <p className="text-sm text-blue-700 mt-1">
                         Free accounts can upload 1 document. Upgrade to Pro for
-                        unlimited uploads and advanced features.
+                        25 uploads per month and advanced features.
                       </p>
                       <Link href="/pricing" className="mt-3 inline-block">
                         <Button

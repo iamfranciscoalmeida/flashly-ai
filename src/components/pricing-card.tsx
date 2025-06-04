@@ -17,27 +17,30 @@ const getPlanFeatures = (planName: string) => {
 
   if (planNameLower.includes("free")) {
     return [
-      "5 document uploads per month",
+      "1 document upload per month",
       "Basic flashcard generation",
       "Limited quiz generation",
       "Community support",
     ];
   } else if (planNameLower.includes("pro")) {
     return [
-      "25 document uploads per month",
-      "Advanced flashcard generation",
-      "Full quiz generation",
+      "Unlimited document uploads per month",
+      "Unlimited flashcard generation",
+      "Unlimited quiz generation",
       "Priority support",
       "Study progress tracking",
     ];
-  } else if (planNameLower.includes("ultra")) {
+  } else if (planNameLower.includes("custom") || planNameLower.includes("enterprise") || planNameLower.includes("school")) {
     return [
+      "Everything in Pro",
       "Unlimited document uploads",
-      "Advanced AI flashcard generation",
-      "Comprehensive quiz generation",
-      "Priority support",
-      "Advanced study analytics",
-      "Custom study plans",
+      "Team/Class sharing features",
+      "Collaborative study groups",
+      "Admin dashboard & analytics",
+      "Bulk user management",
+      "Custom branding options",
+      "Dedicated support",
+      "Volume discounts available",
     ];
   }
 

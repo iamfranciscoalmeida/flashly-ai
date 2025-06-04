@@ -5,13 +5,13 @@ export default function Hero() {
   return (
     <div className="relative overflow-hidden bg-white">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 opacity-70" />
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-100 opacity-70" />
 
       <div className="relative pt-24 pb-32 sm:pt-32 sm:pb-40">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-4xl mx-auto">
             <div className="flex justify-center mb-6">
-              <div className="bg-blue-100 text-blue-600 px-4 py-1.5 rounded-full text-sm font-medium flex items-center">
+              <div className="bg-gray-100 text-black px-4 py-1.5 rounded-full text-sm font-medium flex items-center">
                 <BookOpen className="w-4 h-4 mr-2" />
                 AI-Powered Study Platform
               </div>
@@ -19,7 +19,7 @@ export default function Hero() {
 
             <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 mb-8 tracking-tight">
               Study{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-black to-gray-600">
                 Smarter
               </span>{" "}
               with AI-Generated Materials
@@ -72,7 +72,7 @@ export default function Hero() {
                   className="w-full h-auto"
                 />
               </div>
-              <div className="absolute -bottom-6 -right-6 bg-blue-600 text-white p-4 rounded-lg shadow-lg hidden md:flex items-center">
+              <div className="absolute -bottom-6 -right-6 bg-black text-white p-4 rounded-lg shadow-lg hidden md:flex items-center">
                 <Brain className="w-5 h-5 mr-2" />
                 <span className="font-medium">AI-powered learning</span>
               </div>

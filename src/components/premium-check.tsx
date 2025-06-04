@@ -53,9 +53,9 @@ export function PremiumCheck({ children, fallback }: PremiumCheckProps) {
 
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-2xl font-bold mb-4">Premium Feature</h2>
+        <h2 className="text-2xl font-bold mb-4">Pro Feature</h2>
         <p className="mb-6 text-muted-foreground">
-          This feature requires a premium subscription.
+          This feature requires a Pro subscription.
         </p>
         <a
           href="/pricing"
