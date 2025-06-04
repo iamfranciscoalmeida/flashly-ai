@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 interface DocumentViewerProps {
   documentId: string;
-  documentUrl?: string;
+  documentUrl?: string | null;
   documentType: string;
   pageCount?: number;
   className?: string;

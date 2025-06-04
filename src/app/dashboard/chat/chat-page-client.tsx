@@ -19,7 +19,7 @@ import {
 import { EnhancedDocument, ChatSession } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../../../supabase/client';
+import { createClient } from '@/supabase/client';
 
 interface ChatPageClientProps {
   initialDocuments: EnhancedDocument[];

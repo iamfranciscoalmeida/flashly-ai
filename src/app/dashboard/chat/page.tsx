@@ -1,4 +1,4 @@
-import { createClient } from "../../../../supabase/server";
+import { createClient } from "@/supabase/server";
 import { redirect } from "next/navigation";
 import { ChatPageClient } from "./chat-page-client";
 

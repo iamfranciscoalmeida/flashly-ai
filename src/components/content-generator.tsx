@@ -135,9 +135,7 @@ export function ContentGenerator({
             </p>
             {currentCard.difficulty_level && (
               <div className="mt-4">
-                <Badge variant="outline">
-                  {currentCard.difficulty_level}
-                </Badge>
+                <Badge variant="outline">{currentCard.difficulty_level}</Badge>
               </div>
             )}
           </div>
@@ -165,9 +163,7 @@ export function ContentGenerator({
                   </p>
                   {question.difficulty_level && (
                     <div>
-                      <Badge variant="outline">
-                        {question.difficulty_level}
-                      </Badge>
+                      <Badge variant="outline">{question.difficulty_level}</Badge>
                     </div>
                   )}
                 </div>

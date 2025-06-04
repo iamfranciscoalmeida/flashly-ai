@@ -76,7 +76,7 @@ export type EnhancedModule = {
   start_page: number | null;
   end_page: number | null;
   content_excerpt: string | null;
-  embedding: number[] | null;
+  // embedding: number[] | null; // Commented out until vector extension is enabled
   chunk_index: number;
   created_at: string | null;
   updated_at: string | null;

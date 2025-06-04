@@ -8,7 +8,6 @@ ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 
 -- Update modules table
 ALTER TABLE modules
-ADD COLUMN IF NOT EXISTS embedding VECTOR(1536),
 ADD COLUMN IF NOT EXISTS chunk_index INTEGER DEFAULT 0;
 
 -- Update flashcards table
@@ -27,8 +26,7 @@ ADD COLUMN IF NOT EXISTS tags TEXT[];
 -- Create index on source_type for documents
 CREATE INDEX IF NOT EXISTS idx_documents_source_type ON documents(source_type);
 
--- Create index on embedding for similarity search
-CREATE INDEX IF NOT EXISTS idx_modules_embedding ON modules USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-
--- Enable pgvector extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Enable pgvector extension if not already enabled (commented out for now)
+-- CREATE EXTENSION IF NOT EXISTS vector;
+-- ALTER TABLE modules ADD COLUMN IF NOT EXISTS embedding VECTOR(1536);
+-- CREATE INDEX IF NOT EXISTS idx_modules_embedding ON modules USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

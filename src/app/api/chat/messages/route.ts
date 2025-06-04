@@ -1,4 +1,4 @@
-import { createClient } from "../../../../../supabase/server";
+import { createClient } from "@/supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { Message } from "@/types/database";
