@@ -123,18 +123,20 @@ export default function DocumentList({
         "postgres_changes",
         { event: "*", schema: "public", table: "documents" },
         (payload) => {
+          // Type the payload data properly
+          const newDoc = payload.new as Document | null;
+          const oldDoc = payload.old as Document | null;
+          
           // Only process changes for the current folder view
           const isRelevantToCurrentView =
-            (selectedFolderId && payload.new?.folder_id === selectedFolderId) ||
-            (!selectedFolderId && !payload.new?.folder_id);
+            (selectedFolderId && newDoc?.folder_id === selectedFolderId) ||
+            (!selectedFolderId && !newDoc?.folder_id);
 
           // Handle different types of changes
-          if (payload.eventType === "INSERT" && isRelevantToCurrentView) {
-            setDocuments((prev) => [payload.new as Document, ...prev]);
-          } else if (payload.eventType === "UPDATE") {
+          if (payload.eventType === "INSERT" && isRelevantToCurrentView && newDoc) {
+            setDocuments((prev) => [newDoc, ...prev]);
+          } else if (payload.eventType === "UPDATE" && newDoc && oldDoc) {
             // For updates, we need to handle documents moving between folders
-            const oldDoc = payload.old as Document;
-            const newDoc = payload.new as Document;
 
             // Document moved into current folder view
             if (
@@ -163,9 +165,9 @@ export default function DocumentList({
                 onSelectDocument(newDoc);
               }
             }
-          } else if (payload.eventType === "DELETE") {
+          } else if (payload.eventType === "DELETE" && oldDoc) {
             setDocuments((prev) =>
-              prev.filter((doc) => doc.id !== payload.old.id),
+              prev.filter((doc) => doc.id !== oldDoc.id),
             );
           }
         },
