@@ -140,16 +140,17 @@ export default async function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-blue-500" />
-                  <span>Study Dashboard</span>
+                  <span>AI Chat Tutor</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Access your flashcards, quizzes, and study materials.
+                  Start AI-powered study conversations with context from your
+                  materials.
                 </p>
-                <Link href="/dashboard/study">
+                <Link href="/chat">
                   <Button className="w-full sm:w-auto">
-                    Go to Study Dashboard
+                    Start Chat Session
                   </Button>
                 </Link>
               </CardContent>

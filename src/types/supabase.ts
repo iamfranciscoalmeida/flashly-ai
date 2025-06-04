@@ -9,6 +9,152 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "study_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_materials: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: string
+          payload: Json
+          type: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          payload: Json
+          type: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          payload?: Json
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_materials_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          context_blob: string | null
+          context_source: string | null
+          context_type: string | null
+          created_at: string | null
+          id: string
+          space_id: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          context_blob?: string | null
+          context_source?: string | null
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          space_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          context_blob?: string | null
+          context_source?: string | null
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          space_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           created_at: string | null
@@ -117,18 +263,24 @@ export type Database = {
       folders: {
         Row: {
           created_at: string | null
+          description: string | null
+          icon: string | null
           id: string
           name: string
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
+          icon?: string | null
           id?: string
           name: string
           user_id: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
+          icon?: string | null
           id?: string
           name?: string
           user_id?: string
@@ -137,46 +289,46 @@ export type Database = {
       }
       modules: {
         Row: {
+          content_excerpt: string | null
           created_at: string | null
           document_id: string
+          end_page: number | null
           folder_id: string | null
           id: string
           order: number
+          start_page: number | null
           summary: string | null
           title: string
           updated_at: string | null
           user_id: string
-          start_page: number | null
-          end_page: number | null
-          content_excerpt: string | null
         }
         Insert: {
+          content_excerpt?: string | null
           created_at?: string | null
           document_id: string
+          end_page?: number | null
           folder_id?: string | null
           id?: string
           order: number
+          start_page?: number | null
           summary?: string | null
           title: string
           updated_at?: string | null
           user_id: string
-          start_page?: number | null
-          end_page?: number | null
-          content_excerpt?: string | null
         }
         Update: {
+          content_excerpt?: string | null
           created_at?: string | null
           document_id?: string
+          end_page?: number | null
           folder_id?: string | null
           id?: string
           order?: number
+          start_page?: number | null
           summary?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
-          start_page?: number | null
-          end_page?: number | null
-          content_excerpt?: string | null
         }
         Relationships: [
           {
@@ -191,6 +343,47 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      processing_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          document_id: string
+          error_message: string | null
+          id: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          document_id: string
+          error_message?: string | null
+          id?: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          document_id?: string
+          error_message?: string | null
+          id?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_jobs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
@@ -256,32 +449,73 @@ export type Database = {
           },
         ]
       }
+      session_content: {
+        Row: {
+          content: Json
+          content_type: string
+          created_at: string | null
+          id: string
+          session_id: string
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: Json
+          content_type: string
+          created_at?: string | null
+          id?: string
+          session_id: string
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          session_id?: string
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_content_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "study_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_materials: {
         Row: {
+          created_at: string | null
+          generated_at: string | null
           id: string
           module_id: string
-          type: 'flashcards' | 'quiz' | 'summary'
           payload: Json
-          generated_at: string | null
-          created_at: string | null
+          type: string
           updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
+          generated_at?: string | null
           id?: string
           module_id: string
-          type: 'flashcards' | 'quiz' | 'summary'
           payload: Json
-          generated_at?: string | null
-          created_at?: string | null
+          type: string
           updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
+          generated_at?: string | null
           id?: string
           module_id?: string
-          type?: 'flashcards' | 'quiz' | 'summary'
           payload?: Json
-          generated_at?: string | null
-          created_at?: string | null
+          type?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -290,6 +524,65 @@ export type Database = {
             columns: ["module_id"]
             isOneToOne: false
             referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_sessions: {
+        Row: {
+          auto_labels: Json | null
+          content_text: string | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          level: string | null
+          source_type: string
+          source_url: string | null
+          status: string
+          subject: string | null
+          title: string
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_labels?: Json | null
+          content_text?: string | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          level?: string | null
+          source_type: string
+          source_url?: string | null
+          status?: string
+          subject?: string | null
+          title: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_labels?: Json | null
+          content_text?: string | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          level?: string | null
+          source_type?: string
+          source_url?: string | null
+          status?: string
+          subject?: string | null
+          title?: string
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
