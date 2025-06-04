@@ -47,7 +47,7 @@ export default async function Pricing() {
             licenses.
           </p>
           <a
-            href="mailto:sales@studyai.com"
+            href="mailto:sales@studywithai.io"
             className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             Contact Sales

@@ -10,7 +10,6 @@ import {
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import {
-  BookOpen,
   Home,
   FileText,
   Sparkles,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import UserProfile from "./user-profile";
+import Logo from "./logo";
 
 export default function DashboardNavbar() {
   const supabase = createClient();
@@ -33,8 +33,8 @@ export default function DashboardNavbar() {
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link href="/" prefetch className="flex items-center">
-            <BookOpen className="h-6 w-6 text-blue-600 mr-2" />
-            <span className="text-xl font-bold">StudyAI</span>
+            <Logo className="mr-2" />
+            <span className="text-xl font-bold">StudyWithAI</span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-1">

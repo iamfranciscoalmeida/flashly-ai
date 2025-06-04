@@ -1,4 +1,5 @@
 {
+  "name": "studywithai",
   "private": true,
   "scripts": {
     "dev": "next dev",

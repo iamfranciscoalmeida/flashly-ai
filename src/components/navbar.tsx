@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createClient } from "../../supabase/server";
 import { Button } from "./ui/button";
-import { BookOpen, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 import UserProfile from "./user-profile";
+import Logo from "./logo";
 
 export default async function Navbar() {
   const supabase = createClient();
@@ -15,8 +16,8 @@ export default async function Navbar() {
     <nav className="w-full border-b border-gray-200 bg-white py-3">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link href="/" prefetch className="flex items-center">
-          <BookOpen className="h-6 w-6 text-blue-600 mr-2" />
-          <span className="text-xl font-bold">StudyAI</span>
+          <Logo className="mr-2" />
+          <span className="text-xl font-bold">StudyWithAI</span>
         </Link>
 
         <div className="hidden md:flex space-x-6">
