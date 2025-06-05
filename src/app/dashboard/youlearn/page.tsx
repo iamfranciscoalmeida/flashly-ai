@@ -9,43 +9,9 @@ export default function YouLearnPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    createSession();
+    // Just set loading to false - don't auto-create sessions
+    setIsLoading(false);
   }, []);
-
-  const createSession = async () => {
-    try {
-      const supabase = createClient();
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('No user found');
-        return;
-      }
-
-      // Create a new chat session
-      const { data: session, error } = await supabase
-        .from('chat_sessions')
-        .insert({
-          user_id: user.id,
-          title: 'YouLearn Chat',
-          last_message_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating session:', error);
-        return;
-      }
-
-      setSessionId(session.id);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -58,21 +24,12 @@ export default function YouLearnPage() {
     );
   }
 
-  if (!sessionId) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">Failed to create session. Please try again.</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Always show the YouLearnChatInterface - it will handle session creation when needed
   return (
     <div className="h-screen">
       <YouLearnChatInterface 
         sessionId={sessionId}
-        onNewContent={(content, type) => {
+        onNewContent={(content: string, type: 'upload' | 'paste' | 'record') => {
           console.log('New content added:', { content: content.substring(0, 100), type });
         }}
       />

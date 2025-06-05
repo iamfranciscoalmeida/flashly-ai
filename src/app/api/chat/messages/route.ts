@@ -1,158 +1,220 @@
-import { createClient } from "@/supabase/server";
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { Message } from "@/types/database";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/supabase/server';
+import { createChatCompletion } from '@/lib/openai-config';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-
-    // Get the current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Authentication failed:', authError);
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Parse request body
-    const { sessionId, content, documentId, moduleId } = await request.json();
+    const { sessionId, message, attachments, context } = await request.json();
 
-    if (!sessionId || !content) {
-      return NextResponse.json(
-        { error: "Session ID and content are required" },
-        { status: 400 }
-      );
+    if (!sessionId || !message) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Verify the session belongs to the user
-    const { data: session, error: sessionError } = await supabase
-      .from("chat_sessions")
-      .select("*")
-      .eq("id", sessionId)
-      .eq("user_id", user.id)
+    // Verify session belongs to user
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
       .single();
 
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: "Session not found" },
-        { status: 404 }
-      );
-    }
-
-    // Get document context if available
-    let documentContext = "";
-    if (documentId) {
-      const { data: document } = await supabase
-        .from("documents")
-        .select("extracted_text, file_name")
-        .eq("id", documentId)
-        .single();
-
-      if (document && document.extracted_text) {
-        documentContext = `Document: ${document.file_name}\n\nContent: ${document.extracted_text.substring(0, 3000)}...\n\n`;
-      }
-
-      // Get relevant modules if available
-      if (moduleId) {
-        const { data: module } = await supabase
-          .from("modules")
-          .select("title, summary, content_excerpt")
-          .eq("id", moduleId)
-          .single();
-
-        if (module) {
-          documentContext += `\nModule: ${module.title}\nSummary: ${module.summary}\nContent: ${module.content_excerpt}\n\n`;
-        }
-      }
+    if (sessionError || !sessionData) {
+      console.error('Session validation error:', sessionError);
+      return NextResponse.json({ error: 'Invalid session or session not found' }, { status: 403 });
     }
 
     // Save user message
-    const { data: userMessage, error: userMessageError } = await supabase
-      .from("messages")
+    let userMessage = null;
+    const { data: userMsgData, error: userMsgError } = await supabase
+      .from('chat_messages')
       .insert({
         session_id: sessionId,
-        role: "user",
-        content: content,
-        metadata: { documentId, moduleId }
+        user_id: user.id,
+        role: 'user',
+        content: message,
+        metadata: attachments ? { attachments } : null
       })
       .select()
       .single();
 
-    if (userMessageError) {
-      throw userMessageError;
+    if (userMsgError) {
+      console.error('Error saving user message:', userMsgError);
+      // If table doesn't exist or RLS fails, continue without saving to database
+      if (userMsgError.code === '42P01' || userMsgError.code === '42501') {
+        console.warn('Database issue, continuing with AI response only');
+        userMessage = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: message,
+          created_at: new Date().toISOString()
+        };
+      } else {
+        return NextResponse.json({ 
+          error: `Failed to save message: ${userMsgError.message}` 
+        }, { status: 500 });
+      }
+    } else {
+      userMessage = userMsgData;
     }
 
     // Get conversation history
-    const { data: messages } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: true })
-      .limit(10);
+    const { data: messages, error: historyError } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(20);
+
+    if (historyError) {
+      console.error('Error fetching history:', historyError);
+    }
 
     // Prepare messages for OpenAI
-    const conversationHistory = messages?.map((msg: Message) => ({
-      role: msg.role as "user" | "assistant" | "system",
+    const conversationHistory = messages?.map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content
     })) || [];
 
-    // Add system message with context
-    const systemMessage = {
-      role: "system" as const,
-      content: `You are an intelligent study assistant helping students learn from their materials. ${documentContext ? `Use the following document context to answer questions:\n\n${documentContext}` : ''} 
+    // Add system prompt
+    const systemPrompt = {
+      role: 'system' as const,
+      content: `You are an AI tutor designed to help students learn effectively. 
+      Your responses should be:
+      - Clear and easy to understand
+      - Educational and informative
+      - Encouraging and supportive
+      - Structured with proper formatting when appropriate
+      - Focused on helping the student understand concepts deeply
       
-      Always provide helpful, accurate, and educational responses. When referencing specific information from the document, cite the source. If asked to generate study materials, create them based on the document content.`
+      When appropriate, use examples, analogies, and break down complex topics into simpler parts.
+      If asked to generate study materials, format them properly for easy consumption.`
     };
 
-    // Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [systemMessage, ...conversationHistory],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
+    // Generate AI response
+    const aiResponse = await createChatCompletion(
+      [systemPrompt, ...conversationHistory],
+      {
+        model: 'gpt-4-turbo-preview',
+        temperature: 0.7,
+        max_tokens: 2000,
+        presence_penalty: 0.1,
+        frequency_penalty: 0.1,
+      }
+    );
 
-    const assistantContent = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-
-    // Save assistant message
-    const { data: assistantMessage, error: assistantMessageError } = await supabase
-      .from("messages")
+    // Save AI response
+    let aiMessage = null;
+    const { data: aiMsgData, error: aiMsgError } = await supabase
+      .from('chat_messages')
       .insert({
         session_id: sessionId,
-        role: "assistant",
-        content: assistantContent,
-        metadata: { 
-          model: "gpt-4-turbo-preview",
-          documentId, 
-          moduleId,
-          usage: completion.usage
+        user_id: user.id,
+        role: 'assistant',
+        content: aiResponse,
+        metadata: {
+          model: 'gpt-4-turbo-preview',
+          response_length: aiResponse.length
         }
       })
       .select()
       .single();
 
-    if (assistantMessageError) {
-      throw assistantMessageError;
+    if (aiMsgError) {
+      console.error('Error saving AI message:', aiMsgError);
+      // Create fallback AI message object
+      aiMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: aiResponse,
+        created_at: new Date().toISOString()
+      };
+    } else {
+      aiMessage = aiMsgData;
     }
 
-    // Update session last message time
+    // Update session last_message_at
     await supabase
-      .from("chat_sessions")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", sessionId);
+      .from('chat_sessions')
+      .update({ 
+        last_message_at: new Date().toISOString(),
+        metadata: {
+          message_count: (messages?.length || 0) + 2
+        }
+      })
+      .eq('id', sessionId);
 
     return NextResponse.json({
-      success: true,
       userMessage,
-      assistantMessage
+      aiMessage: aiMessage || { content: aiResponse, role: 'assistant' }
     });
+
   } catch (error) {
-    console.error("Error in chat API:", error);
+    console.error('Chat API error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('sessionId');
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Session ID required' }, { status: 400 });
+    }
+
+    // Verify session belongs to user
+    const { data: session, error: sessionError } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 403 });
+    }
+
+    // Get messages
+    const { data: messages, error: messagesError } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+      return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+    }
+
+    return NextResponse.json({ messages });
+
+  } catch (error) {
+    console.error('Get messages error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -123,6 +123,18 @@ export default function StudyDashboard() {
           </div>
           <div className="flex items-center gap-4">
             <DashboardViewToggle view={view} onViewChange={handleViewChange} />
+            <Link href="/dashboard/flashcards-demo">
+              <Button size="sm" variant="outline" className="flex items-center gap-1">
+                <Layers className="h-4 w-4" />
+                <span>Demo Flashcards</span>
+              </Button>
+            </Link>
+            <Link href="/dashboard/quiz-demo">
+              <Button size="sm" variant="outline" className="flex items-center gap-1">
+                <Layers className="h-4 w-4" />
+                <span>Demo Quiz</span>
+              </Button>
+            </Link>
             <Link href="/dashboard/upload">
               <Button size="sm" className="flex items-center gap-1">
                 <Upload className="h-4 w-4" />

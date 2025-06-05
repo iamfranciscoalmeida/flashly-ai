@@ -21,7 +21,8 @@ import { createClient } from "../../supabase/client";
 import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
-import GenerateFlashcardsModal from "./generate-flashcards-modal";
+import { StandaloneFlashcardViewer } from "./standalone-flashcard-viewer";
+import { ContentGeneratorModal } from "./content-generator-modal";
 
 interface Document {
   id: string;
@@ -87,6 +88,7 @@ export default function FlashcardGenerator({
   const [quizScore, setQuizScore] = useState({ correct: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [currentGenerationType, setCurrentGenerationType] = useState<'flashcards' | 'quiz' | 'summary'>('flashcards');
   const supabase = createClient();
 
   useEffect(() => {
@@ -128,6 +130,29 @@ export default function FlashcardGenerator({
       console.error("Error fetching study materials:", error);
       setError(error instanceof Error ? error.message : 'Failed to fetch study materials');
     }
+  };
+
+  const handleGenerateFromModal = async (options: { quantity: number; difficulty: string; pageRange?: any }) => {
+    const type = currentGenerationType;
+    
+    // Convert modal options to API format
+    const apiOptions: any = {};
+    
+    if (type === 'flashcards') {
+      apiOptions.num_cards = options.quantity;
+    } else if (type === 'quiz') {
+      apiOptions.num_questions = options.quantity;
+    } else if (type === 'summary') {
+      apiOptions.maxLength = options.quantity; // For summary, quantity represents word count
+    }
+    
+    apiOptions.difficulty = options.difficulty;
+    if (options.pageRange) {
+      apiOptions.pageRange = options.pageRange;
+    }
+    
+    setShowGenerateModal(false);
+    await generateStudyMaterial(type, apiOptions);
   };
 
   const generateStudyMaterial = async (type: 'flashcards' | 'quiz' | 'summary', options: any = {}) => {
@@ -318,7 +343,10 @@ export default function FlashcardGenerator({
                   Generate AI-powered flashcards for this module.
                 </p>
                 <Button
-                  onClick={() => generateStudyMaterial('flashcards', { num_cards: 5 })}
+                  onClick={() => {
+                    setCurrentGenerationType('flashcards');
+                    setShowGenerateModal(true);
+                  }}
                   disabled={loading.flashcards}
                   className="flex items-center gap-2"
                 >
@@ -328,59 +356,37 @@ export default function FlashcardGenerator({
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">
-                  {currentFlashcardIndex + 1} of {flashcards.length}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => generateStudyMaterial('flashcards', { num_cards: 5 })}
-                  disabled={loading.flashcards}
-                  className="flex items-center gap-1"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                  {loading.flashcards ? "Generating..." : "Regenerate"}
-                </Button>
-              </div>
-
-              <Card className="min-h-[300px] cursor-pointer" onClick={handleFlip}>
-                <CardContent className="p-8 flex items-center justify-center text-center h-full">
-                  <div className="w-full">
-                    <h3 className="text-lg font-medium mb-4">
-                      {flipped ? "Answer" : "Question"}
-                    </h3>
-                    <p className="text-base leading-relaxed">
-                      {flipped
-                        ? flashcards[currentFlashcardIndex]?.answer
-                        : flashcards[currentFlashcardIndex]?.question}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-4">
-                      Click to {flipped ? "see question" : "reveal answer"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-between items-center">
-                <Button
-                  variant="outline"
-                  onClick={handlePreviousFlashcard}
-                  disabled={currentFlashcardIndex === 0}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleNextFlashcard}
-                  disabled={currentFlashcardIndex === flashcards.length - 1}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
+            <div className="h-full overflow-hidden">
+              <StandaloneFlashcardViewer
+                flashcards={flashcards.map((card: any) => ({
+                  question: card.question,
+                  answer: card.answer,
+                  difficulty_level: card.difficulty_level || 'medium',
+                  tags: card.tags || [],
+                  source_reference: {
+                    module: selectedModule?.title || 'Current Module',
+                    generated_at: new Date().toISOString(),
+                    ...(card.source_reference || {})
+                  }
+                }))}
+                title={`${selectedModule?.title || 'Module'} Flashcards`}
+                onShuffle={() => {
+                  // Shuffle the current flashcards
+                  const shuffled = [...flashcards].sort(() => Math.random() - 0.5);
+                  setStudyMaterials(prev => ({
+                    ...prev,
+                    flashcards: {
+                      ...prev.flashcards,
+                      payload: { ...prev.flashcards.payload, flashcards: shuffled }
+                    }
+                  }));
+                }}
+                onRegenerate={() => {
+                  setCurrentGenerationType('flashcards');
+                  setShowGenerateModal(true);
+                }}
+                isLoading={loading.flashcards}
+              />
             </div>
           )}
         </TabsContent>
@@ -397,7 +403,10 @@ export default function FlashcardGenerator({
                   Generate AI-powered quiz questions for this module.
                 </p>
                 <Button
-                  onClick={() => generateStudyMaterial('quiz', { num_questions: 5 })}
+                  onClick={() => {
+                    setCurrentGenerationType('quiz');
+                    setShowGenerateModal(true);
+                  }}
                   disabled={loading.quiz}
                   className="flex items-center gap-2"
                 >
@@ -428,7 +437,10 @@ export default function FlashcardGenerator({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => generateStudyMaterial('quiz', { num_questions: 5 })}
+                    onClick={() => {
+                      setCurrentGenerationType('quiz');
+                      setShowGenerateModal(true);
+                    }}
                     disabled={loading.quiz}
                     className="flex items-center gap-1"
                   >
@@ -528,7 +540,10 @@ export default function FlashcardGenerator({
                   Generate an AI-powered summary for this module.
                 </p>
                 <Button
-                  onClick={() => generateStudyMaterial('summary')}
+                  onClick={() => {
+                    setCurrentGenerationType('summary');
+                    setShowGenerateModal(true);
+                  }}
                   disabled={loading.summary}
                   className="flex items-center gap-2"
                 >
@@ -543,7 +558,10 @@ export default function FlashcardGenerator({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => generateStudyMaterial('summary')}
+                  onClick={() => {
+                    setCurrentGenerationType('summary');
+                    setShowGenerateModal(true);
+                  }}
                   disabled={loading.summary}
                   className="flex items-center gap-1"
                 >
@@ -569,13 +587,13 @@ export default function FlashcardGenerator({
         </TabsContent>
       </Tabs>
 
-      {/* Generate Flashcards Modal */}
-      <GenerateFlashcardsModal
+      {/* Content Generator Modal */}
+      <ContentGeneratorModal
+        type={currentGenerationType}
         isOpen={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
-        document={document}
-        folderId={document?.folder_id || null}
-        onGenerationComplete={fetchStudyMaterials}
+        onGenerate={handleGenerateFromModal}
+        isGenerating={loading[currentGenerationType] || false}
       />
     </div>
   );

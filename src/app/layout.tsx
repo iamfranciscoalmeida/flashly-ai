@@ -9,7 +9,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "StudyWithAI - AI-Powered Study Platform for Students",
+  title: "StudyWithAI - AI-Powered Study Platform for Everyone",
   description:
     "Transform your study materials into interactive flashcards and quizzes with our AI-powered learning platform",
 };

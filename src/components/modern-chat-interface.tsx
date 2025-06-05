@@ -1,0 +1,1949 @@
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { 
+  Upload, 
+  Link2, 
+  Mic, 
+  Send, 
+  FileText, 
+  Youtube, 
+  Globe,
+  Plus,
+  Sparkles,
+  Brain,
+  BookOpen,
+  StickyNote,
+  User,
+  Bot,
+  ArrowUp,
+  Paperclip,
+  X,
+  FileIcon,
+  Image,
+  Music,
+  Video,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ThumbsUp,
+  ThumbsDown,
+  Copy,
+  MoreVertical,
+  Download,
+  Share2,
+  Menu,
+  MessageSquare,
+  Trash2,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { toast } from "@/components/ui/use-toast";
+import { DocumentViewer } from "@/components/document-viewer";
+import { StandaloneFlashcardViewer } from "@/components/standalone-flashcard-viewer";
+import { StandaloneQuizViewer } from "@/components/standalone-quiz-viewer";
+import { GenerationSettingsModal } from "@/components/generation-settings-modal";
+
+interface ChatSession {
+  id: string;
+  title: string;
+  last_message_at: string;
+  created_at: string;
+}
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  status?: 'sending' | 'sent' | 'error';
+  attachments?: FileAttachment[];
+  feedback?: 'positive' | 'negative';
+  isTyping?: boolean;
+  type?: string;
+  specialContent?: any;
+}
+
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  status: 'uploading' | 'processing' | 'ready' | 'error';
+  progress?: number;
+  documentId?: string;
+}
+
+interface ModernChatInterfaceProps {
+  sessionId: string;
+  userId: string;
+  onNewContent?: (content: string, type: 'upload' | 'paste' | 'record') => void;
+}
+
+export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernChatInterfaceProps) {
+  const router = useRouter();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showLandingPage, setShowLandingPage] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [sessionContent, setSessionContent] = useState('');
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteInput, setPasteInput] = useState('');
+  const [uploadedDocument, setUploadedDocument] = useState<{id: string, name: string, url: string, type: string} | null>(null);
+  const [showFlashcards, setShowFlashcards] = useState(false);
+  const [currentFlashcards, setCurrentFlashcards] = useState<any[]>([]);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [currentQuiz, setCurrentQuiz] = useState<any[]>([]);
+  const [quizMode, setQuizMode] = useState<'multiple-choice' | 'free-answer'>('multiple-choice');
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsType, setSettingsType] = useState<'flashcards' | 'quiz'>('flashcards');
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Session management state
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [showSidebar, setShowSidebar] = useState(true); // Show sidebar by default
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load sessions on component mount
+  useEffect(() => {
+    loadSessions();
+  }, [userId]);
+
+  // Update current session when sessionId prop changes
+  useEffect(() => {
+    if (sessionId && sessions.length > 0) {
+      const session = sessions.find(s => s.id === sessionId);
+      if (session) {
+        console.log('Updating currentSession to:', session.id, session.title);
+        setCurrentSession(session);
+      }
+    }
+  }, [sessionId, sessions]);
+
+  // Session management functions
+  const loadSessions = async () => {
+    try {
+      const supabase = (await import('@/supabase/client')).createClient();
+      
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User not authenticated:', authError);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('last_message_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error loading sessions:', error);
+        return;
+      }
+
+      setSessions(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const createNewSession = async () => {
+    try {
+      const supabase = (await import('@/supabase/client')).createClient();
+      
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User not authenticated:', authError);
+        toast({
+          title: "Error",
+          description: "User not authenticated. Please refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: user.id,
+          title: 'New Chat',
+          last_message_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating session:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create new session. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSessions([data, ...sessions]);
+      setCurrentSession(data);
+      setShowSidebar(false);
+      
+      // Navigate to the new session using Next.js router
+      router.push(`/dashboard/chat?sessionId=${data.id}`);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const selectSession = (session: ChatSession) => {
+    console.log('selectSession called with session:', session.id, 'current session:', currentSession?.id);
+    
+    if (currentSession?.id === session.id) {
+      console.log('Same session selected, just closing sidebar');
+      setShowSidebar(false);
+      return;
+    }
+    
+    console.log('Navigating to session:', session.id);
+    // Navigate to the selected session using Next.js router for client-side navigation
+    router.push(`/dashboard/chat?sessionId=${session.id}`);
+  };
+
+  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const supabase = (await import('@/supabase/client')).createClient();
+      
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User not authenticated:', authError);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId)
+        .eq('user_id', user.id); // Ensure user can only delete their own sessions
+
+      if (error) {
+        console.error('Error deleting session:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete session. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const remainingSessions = sessions.filter(s => s.id !== sessionId);
+      setSessions(remainingSessions);
+      
+      if (currentSession?.id === sessionId) {
+        // If we deleted the current session, navigate to another existing session or go back to session selector
+        if (remainingSessions.length > 0) {
+          // Navigate to the most recent remaining session
+          const mostRecentSession = remainingSessions[0];
+          router.push(`/dashboard/chat?sessionId=${mostRecentSession.id}`);
+        } else {
+          // No sessions left, go to session selector
+          router.push('/dashboard/chat');
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  // Load message history when session changes
+  useEffect(() => {
+    console.log('ModernChatInterface sessionId changed to:', sessionId);
+    const loadMessageHistory = async () => {
+      if (!sessionId) {
+        // No sessionId provided - show session selector
+        setIsLoadingHistory(false);
+        setShowLandingPage(true);
+        setMessages([]);
+        setUploadedDocument(null);
+        setSessionContent('');
+        return;
+      }
+      
+      setIsLoadingHistory(true);
+      setMessages([]); // Clear current messages
+      setShowLandingPage(true); // Reset to landing page
+      setUploadedDocument(null); // Clear uploaded document
+      setSessionContent(''); // Clear session content
+      
+      try {
+        // Get session data including document_id
+        const supabase = (await import('@/supabase/client')).createClient();
+        const { data: sessionData, error: sessionError } = await supabase
+          .from('chat_sessions')
+          .select(`
+            *,
+            documents (
+              id,
+              file_name,
+              file_path,
+              file_type
+            )
+          `)
+          .eq('id', sessionId)
+          .single();
+
+        if (sessionError) {
+          console.error('Error loading session:', sessionError);
+        }
+
+        // If session has an associated document, restore it
+        if (sessionData?.documents) {
+          const doc = sessionData.documents;
+          const { data: urlData } = supabase.storage
+            .from('study-documents')
+            .getPublicUrl(doc.file_path);
+          
+          setUploadedDocument({
+            id: doc.id,
+            name: doc.file_name,
+            url: urlData.publicUrl,
+            type: doc.file_type
+          });
+          console.log('Restored document for session:', doc.file_name);
+        }
+
+        const response = await fetch(`/api/chat/messages?sessionId=${sessionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.messages && data.messages.length > 0) {
+            const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+              id: msg.id,
+              role: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+              status: 'sent' as const,
+              attachments: msg.metadata?.attachments || [],
+              type: msg.metadata?.type,
+              specialContent: msg.metadata?.specialContent
+            }));
+            setMessages(formattedMessages);
+            setShowLandingPage(false);
+            
+            // Restore session content if available
+            const userMessages = formattedMessages.filter(m => m.role === 'user');
+            if (userMessages.length > 0) {
+              const content = userMessages.map(m => m.content).join('\n\n');
+              setSessionContent(content);
+            }
+          } else {
+            // No messages, show landing page only if no document is associated
+            setShowLandingPage(!sessionData?.documents);
+          }
+        } else if (response.status === 401 || response.status === 403) {
+          console.error('Authentication failed when loading messages');
+          toast({
+            title: "Authentication Error",
+            description: "Please refresh the page and log in again.",
+            variant: "destructive",
+          });
+        } else {
+          console.error('Failed to load messages:', response.status);
+          setShowLandingPage(true);
+        }
+      } catch (error) {
+        console.error('Error loading message history:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load message history",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadMessageHistory();
+  }, [sessionId]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    }
+  }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+    }
+  }, [input]);
+
+  // File upload handlers
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return;
+
+    const newAttachments: FileAttachment[] = Array.from(files).map(file => ({
+      id: Date.now().toString() + Math.random(),
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      status: 'uploading' as const,
+      progress: 0
+    }));
+
+    setAttachments(prev => [...prev, ...newAttachments]);
+    
+    // Simulate file upload with progress
+    newAttachments.forEach((attachment, index) => {
+      simulateFileUpload(attachment.id, files[index]);
+    });
+  };
+
+  const simulateFileUpload = async (attachmentId: string, file: File) => {
+    // Simulate progress
+    for (let progress = 0; progress <= 100; progress += 10) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setAttachments((prev: FileAttachment[]) => prev.map((att: FileAttachment) => 
+        att.id === attachmentId ? { ...att, progress } : att
+      ));
+    }
+
+    // Mark as processing
+    setAttachments((prev: FileAttachment[]) => prev.map((att: FileAttachment) => 
+      att.id === attachmentId ? { ...att, status: 'processing' as const } : att
+    ));
+
+    try {
+      // Upload file to Supabase storage for PDFs and other documents
+      if (file.type === 'application/pdf' || file.type.includes('document') || file.type === 'text/plain') {
+        const supabase = (await import('@/supabase/client')).createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          // Upload to Supabase storage
+          const fileName = `${user.id}/${Date.now()}_${file.name}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('study-documents')
+            .upload(fileName, file);
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw uploadError;
+          }
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('study-documents')
+            .getPublicUrl(fileName);
+
+          // Create document record
+          const { data: docData, error: docError } = await supabase
+            .from('documents')
+            .insert({
+              user_id: user.id,
+              file_name: file.name,
+              file_path: fileName,
+              file_size: file.size,
+              file_type: file.type,
+              status: 'processing',
+              source_type: 'file'
+            })
+            .select()
+            .single();
+
+          if (docError) {
+            console.error('Document creation error:', docError);
+            throw docError;
+          }
+
+          // For PDFs, trigger text extraction and enhanced title generation
+          if (file.type === 'application/pdf') {
+            try {
+              const extractResponse = await fetch('/api/documents/extract-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ documentId: docData.id })
+              });
+              
+              if (extractResponse.ok) {
+                console.log('Text extraction initiated for PDF');
+                
+                // After successful text extraction, generate a better title using document content
+                // We'll do this with a slight delay to allow text extraction to complete
+                setTimeout(async () => {
+                  try {
+                    // Get the extracted text
+                    const { data: updatedDoc, error: docFetchError } = await supabase
+                      .from('documents')
+                      .select('extracted_text')
+                      .eq('id', docData.id)
+                      .single();
+
+                    if (!docFetchError && updatedDoc?.extracted_text) {
+                      const titleResponse = await fetch('/api/chat/sessions/generate-title', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          sessionId, 
+                          titleSource: 'documentContent',
+                          fileName: file.name,
+                          documentContent: updatedDoc.extracted_text
+                        })
+                      });
+                      
+                      if (titleResponse.ok) {
+                        const { title } = await titleResponse.json();
+                        console.log('Generated enhanced title from document content:', title);
+                        // Reload sessions to update the UI
+                        loadSessions();
+                      }
+                    }
+                  } catch (error) {
+                    console.log('Failed to generate enhanced title from document content:', error);
+                  }
+                }, 3000); // 3 second delay to allow text extraction
+              } else {
+                console.warn('Failed to initiate text extraction');
+              }
+            } catch (extractError) {
+              console.warn('Error initiating text extraction:', extractError);
+            }
+          }
+
+          // Mark as ready with document info
+          setAttachments((prev: FileAttachment[]) => prev.map((att: FileAttachment) => 
+            att.id === attachmentId ? { 
+              ...att, 
+              status: 'ready' as const, 
+              url: urlData.publicUrl,
+              documentId: docData.id
+            } : att
+          ));
+
+          // Set uploaded document for viewer
+          setUploadedDocument({
+            id: docData.id,
+            name: file.name,
+            url: urlData.publicUrl,
+            type: file.type
+          });
+
+          // Update the current chat session to link it with this document
+          if (sessionId) {
+            try {
+              const { error: updateError } = await supabase
+                .from('chat_sessions')
+                .update({ document_id: docData.id })
+                .eq('id', sessionId);
+
+              if (updateError) {
+                console.error('Error linking document to session:', updateError);
+              } else {
+                console.log('Successfully linked document to session');
+              }
+            } catch (linkError) {
+              console.error('Error updating session with document:', linkError);
+            }
+
+            // Generate title immediately based on file name
+            try {
+              const titleResponse = await fetch('/api/chat/sessions/generate-title', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  sessionId, 
+                  titleSource: 'fileName',
+                  fileName: file.name
+                })
+              });
+              
+              if (titleResponse.ok) {
+                const { title } = await titleResponse.json();
+                console.log('Generated title from filename:', title);
+                // Reload sessions to update the UI
+                loadSessions();
+              }
+            } catch (error) {
+              console.log('Failed to generate title from filename:', error);
+            }
+          }
+
+          // Add message about upload
+          addMessage('user', `Uploaded document: ${file.name}`);
+          addMessage('assistant', `I've received your document "${file.name}". I can now help you analyze it, create study materials, or answer questions about its content!`);
+          
+          // Notify parent component
+          onNewContent?.(file.name, 'upload');
+          setShowLandingPage(false);
+
+        } else {
+          throw new Error('User not authenticated');
+        }
+      } else {
+        // For other file types, create object URL
+        const url = URL.createObjectURL(file);
+        setAttachments((prev: FileAttachment[]) => prev.map((att: FileAttachment) => 
+          att.id === attachmentId ? { ...att, status: 'ready' as const, url } : att
+        ));
+
+        // Read text content for text files
+        if (file.type.startsWith('text/')) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            setSessionContent((prev: string) => prev + '\n\n' + content);
+            onNewContent?.(content, 'upload');
+          };
+          reader.readAsText(file);
+        }
+
+        addMessage('user', `Uploaded file: ${file.name}`);
+        addMessage('assistant', `I've received your file "${file.name}". How can I help you with it?`);
+        setShowLandingPage(false);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setAttachments((prev: FileAttachment[]) => prev.map((att: FileAttachment) => 
+        att.id === attachmentId ? { ...att, status: 'error' as const } : att
+      ));
+      
+      addMessage('assistant', `Sorry, there was an error uploading "${file.name}". Please try again.`);
+      
+      toast({
+        title: "Upload Error",
+        description: `Failed to upload ${file.name}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
+  };
+
+  // Message handlers - now saves to database
+  const addMessage = async (role: Message['role'], content: string, type?: string, specialContent?: any, attachments?: FileAttachment[]) => {
+    const newMessage: Message = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role,
+      content,
+      timestamp: new Date(),
+      status: 'sending',
+      attachments: attachments?.filter(att => att.status === 'ready'),
+      type,
+      specialContent
+    };
+    
+    setMessages((prev: Message[]) => [...prev, newMessage]);
+    
+    // Save to database (only for real messages, not typing indicators)
+    if (role !== 'system' && !newMessage.isTyping && sessionId) {
+      try {
+        const supabase = (await import('@/supabase/client')).createClient();
+        
+        // Check if user is authenticated
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          console.error('User not authenticated:', authError);
+          throw new Error('User not authenticated');
+        }
+
+        const { error: insertError } = await supabase
+          .from('chat_messages')
+          .insert({
+            session_id: sessionId,
+            user_id: user.id,
+            role: role,
+            content: content,
+            metadata: {
+              attachments: attachments?.filter(att => att.status === 'ready'),
+              type: type,
+              specialContent: specialContent
+            }
+          });
+
+        if (insertError) {
+          console.error('Database insert error:', insertError);
+          throw insertError;
+        }
+        
+        // Mark as sent
+        setMessages((prev: Message[]) => prev.map((msg: Message) => 
+          msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
+        ));
+
+        // Generate AI title more frequently and earlier
+        const currentMessageCount = messages.length + 1;
+        
+        // Generate title after first user message (2 messages total) if no file was uploaded
+        // Or after every 3 messages to keep titles updated with conversation evolution
+        const shouldGenerateTitle = 
+          (currentMessageCount === 2) || // After first user message
+          (currentMessageCount >= 4 && currentMessageCount % 3 === 1); // Every 3 messages after that
+          
+        if (shouldGenerateTitle) {
+          try {
+            const titleResponse = await fetch('/api/chat/sessions/generate-title', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                sessionId,
+                titleSource: 'chat'
+              })
+            });
+            
+            if (titleResponse.ok) {
+              const { title } = await titleResponse.json();
+              console.log('Generated new session title from chat:', title);
+              // Reload sessions to update the UI
+              loadSessions();
+            }
+          } catch (error) {
+            console.log('Failed to generate title from chat:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to save message to database:', error);
+        // Mark as error status
+        setMessages((prev: Message[]) => prev.map((msg: Message) => 
+          msg.id === newMessage.id ? { ...msg, status: 'error' } : msg
+        ));
+      }
+    } else {
+      // For typing indicators and system messages, just mark as sent locally
+      setTimeout(() => {
+        setMessages((prev: Message[]) => prev.map((msg: Message) => 
+          msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
+        ));
+      }, 300);
+    }
+    
+    return newMessage;
+  };
+
+  const sendMessage = async () => {
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
+
+    // Validate required fields
+    if (!sessionId) {
+      console.error('No sessionId available');
+      toast({
+        title: "Error",
+        description: "No session available. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+
+
+    setShowLandingPage(false);
+    const userMessage = input.trim();
+    const readyAttachments = attachments.filter((att: FileAttachment) => att.status === 'ready');
+    
+    console.log('Sending message with:', { sessionId, userMessage, attachments: readyAttachments.length });
+    
+    // Add user message immediately for better UX
+    addMessage('user', userMessage, undefined, undefined, readyAttachments);
+    setInput('');
+    setAttachments([]);
+    setIsLoading(true);
+
+    // Add typing indicator
+    const typingMessage: Message = {
+      id: 'typing',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isTyping: true
+    };
+    setMessages((prev: Message[]) => [...prev, typingMessage]);
+
+    try {
+      // Validate and prepare the request body
+      const requestBody = {
+        sessionId: sessionId,
+        message: userMessage,
+        attachments: readyAttachments,
+        context: sessionContent || ''
+      };
+
+      console.log('Request body:', requestBody);
+
+      // Call the real API
+      const response = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API Error:', response.status, errorData);
+        throw new Error(`Failed to send message: ${errorData.error || 'Unknown error'}`);
+      }
+
+      const data = await response.json();
+      
+      // Remove typing indicator
+      setMessages((prev: Message[]) => prev.filter((msg: Message) => msg.id !== 'typing'));
+      
+      // Add AI response
+      if (data.aiMessage) {
+        addMessage('assistant', data.aiMessage.content);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove typing indicator
+      setMessages((prev: Message[]) => prev.filter((msg: Message) => msg.id !== 'typing'));
+      
+      // Show error message
+      addMessage('assistant', 'I apologize, but I encountered an error. Please try again or refresh the page if the issue persists.');
+      
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
+    setMessages((prev: Message[]) => prev.map((msg: Message) => 
+      msg.id === messageId ? { ...msg, feedback } : msg
+    ));
+    toast({
+      title: feedback === 'positive' ? "Thanks for your feedback!" : "Feedback noted",
+      description: feedback === 'positive' 
+        ? "Glad this was helpful!" 
+        : "We'll work on improving our responses.",
+    });
+  };
+
+  const copyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    toast({
+      title: "Copied!",
+      description: "Message copied to clipboard",
+    });
+  };
+
+  const generateContent = async (
+    type: 'flashcards' | 'quiz' | 'summary' | 'notes', 
+    settings?: { 
+      count: number; 
+      difficulty: 'easy' | 'medium' | 'hard' | 'mixed'; 
+      difficultyDistribution: { easy: number; medium: number; hard: number; }; 
+    }
+  ) => {
+    // Gather content from multiple sources
+    let content = sessionContent || '';
+    
+    // Add conversation context to provide more context
+    const conversationContext = messages
+      .filter(m => m.role === 'user' && m.content.trim().length > 0 && !m.content.startsWith('Generate'))
+      .map(m => m.content)
+      .join('\n\n');
+    
+    if (conversationContext) {
+      content += content ? `\n\nUser interactions:\n${conversationContext}` : conversationContext;
+    }
+
+    // If we have an uploaded document but no extracted content, 
+    // let the API handle document text extraction
+    if (uploadedDocument && !content.trim()) {
+      content = `Please generate ${type} from the uploaded document: ${uploadedDocument.name}`;
+    }
+
+    // Check if we have any content to work with
+    if (!content.trim() && !uploadedDocument) {
+      toast({
+        title: "No content available",
+        description: "Please upload content, paste text, or have a conversation first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setIsGenerating(true);
+    setShowLandingPage(false);
+    
+    // Add user message with settings info
+    const settingsText = settings 
+      ? ` (${settings.count} items, ${settings.difficulty === 'mixed' ? 'mixed difficulty' : settings.difficulty} difficulty)`
+      : '';
+    addMessage('user', `Generate ${type} from the ${uploadedDocument ? 'uploaded document' : 'content'}${settingsText}`);
+    
+    // Add typing indicator
+    const typingMessage: Message = {
+      id: 'typing',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isTyping: true
+    };
+    setMessages(prev => [...prev, typingMessage]);
+
+    try {
+      // Prepare options based on settings
+      const options = {
+        quantity: settings?.count || 10,
+        difficulty: settings?.difficulty || 'medium',
+        difficultyDistribution: settings?.difficulty === 'mixed' ? settings.difficultyDistribution : undefined
+      };
+
+      const response = await fetch('/api/chat/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          type,
+          content: content.trim(),
+          documentId: uploadedDocument?.id,
+          options
+        })
+      });
+
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Handle flashcards specially - show in interactive viewer
+        if (type === 'flashcards' && data.content) {
+          let flashcards = [];
+          
+          // Parse the flashcards from the response
+          if (Array.isArray(data.content)) {
+            flashcards = data.content;
+          } else if (data.content.flashcards && Array.isArray(data.content.flashcards)) {
+            flashcards = data.content.flashcards;
+          } else if (typeof data.content === 'string') {
+            try {
+              const parsed = JSON.parse(data.content);
+              flashcards = Array.isArray(parsed) ? parsed : (parsed.flashcards || []);
+            } catch (e) {
+              // If parsing fails, treat as non-flashcard content
+              flashcards = [];
+            }
+          }
+          
+          if (flashcards.length > 0) {
+            setCurrentFlashcards(flashcards);
+            setShowFlashcards(true);
+            await addMessage('assistant', `I've generated ${flashcards.length} flashcards for you! Click "View Flashcards" to start studying.`);
+          } else {
+            await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+          }
+        } else if (type === 'quiz') {
+          // Handle quiz content
+          let quiz: any[] = [];
+          if (Array.isArray(data.content)) {
+            quiz = data.content;
+          } else if (typeof data.content === 'string') {
+            try {
+              const parsed = JSON.parse(data.content);
+              quiz = Array.isArray(parsed) ? parsed : (parsed.questions || []);
+            } catch (e) {
+              // If parsing fails, treat as non-quiz content
+              quiz = [];
+            }
+          }
+          
+          if (quiz.length > 0) {
+            setCurrentQuiz(quiz);
+            setShowQuiz(true);
+            await addMessage('assistant', `I've generated ${quiz.length} quiz questions for you! Choose your preferred mode and click "Take Quiz" to test your knowledge.`);
+          } else {
+            await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+          }
+        } else {
+          await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Failed to generate content: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error generating content:', error);
+      setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
+      toast({
+        title: "Generation failed",
+        description: `Failed to generate ${type}. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setIsGenerating(false);
+    }
+  };
+
+  // Settings modal handlers
+  const handleOpenSettingsModal = (type: 'flashcards' | 'quiz') => {
+    setSettingsType(type);
+    setShowSettingsModal(true);
+  };
+
+  const handleGenerateWithSettings = (settings: any) => {
+    setShowSettingsModal(false);
+    generateContent(settingsType, settings);
+  };
+
+  const handlePasteContent = () => {
+    if (pasteInput.trim()) {
+      setSessionContent(prev => prev + '\n\n' + pasteInput);
+      addMessage('user', `Pasted content: ${pasteInput.substring(0, 100)}${pasteInput.length > 100 ? '...' : ''}`);
+      addMessage('assistant', `I've received your content. You can now ask me questions about it or generate study materials!`);
+      onNewContent?.(pasteInput, 'paste');
+      setPasteInput('');
+      setShowPasteModal(false);
+      setShowLandingPage(false);
+    }
+  };
+
+  // Loading state
+  if (isLoadingHistory) {
+    return (
+      <TooltipProvider>
+        <div className="h-full flex bg-white">
+          {/* Mobile sidebar toggle */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute top-4 left-4 z-50 md:hidden"
+            onClick={() => setShowSidebar(!showSidebar)}
+          >
+            {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </Button>
+
+          {/* Sidebar overlay for mobile */}
+          <AnimatePresence>
+            {showSidebar && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                onClick={() => setShowSidebar(false)}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Sidebar */}
+          <AnimatePresence>
+            {showSidebar && (
+              <motion.div
+                initial={{ x: -320, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -320, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="w-80 bg-gray-50 border-r flex flex-col h-full z-50 md:relative md:z-auto fixed"
+              >
+                <div className="p-4 border-b bg-white">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-lg">Sessions</h3>
+                    <Button size="sm" onClick={createNewSession} className="rounded-lg">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-2">
+                    {sessions.map((session: ChatSession) => (
+                      <motion.div
+                        key={session.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Card
+                          className={cn(
+                            "p-4 cursor-pointer hover:shadow-md transition-all group",
+                            currentSession?.id === session.id && "bg-primary/10 border-primary shadow-md"
+                          )}
+                          onClick={() => selectSession(session)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <MessageSquare className={cn(
+                                  "h-4 w-4",
+                                  currentSession?.id === session.id ? "text-primary" : "text-gray-500"
+                                )} />
+                                <p className="text-sm font-medium truncate">{session.title}</p>
+                              </div>
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(session.last_message_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {currentSession?.id === session.id && (
+                                <ChevronRight className="h-4 w-4 text-black" />
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                                onClick={(e: React.MouseEvent) => deleteSession(session.id, e)}
+                              >
+                                <Trash2 className="h-3 w-3 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Loading content */}
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-lg">Loading conversation...</p>
+            </div>
+          </div>
+        </div>
+      </TooltipProvider>
+    );
+  }
+
+  // Main chat interface
+  return (
+    <TooltipProvider>
+      <div className="h-full flex bg-white">
+        {/* Mobile sidebar toggle */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute top-4 left-4 z-50 md:hidden"
+          onClick={() => setShowSidebar(!showSidebar)}
+        >
+          {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+
+        {/* Sidebar overlay for mobile */}
+        <AnimatePresence>
+          {showSidebar && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={() => setShowSidebar(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Sidebar */}
+        <AnimatePresence>
+          {showSidebar && (
+            <motion.div
+              initial={{ x: -320, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -320, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-80 bg-gray-50 border-r flex flex-col h-full z-50 md:relative md:z-auto fixed"
+            >
+              <div className="p-4 border-b bg-white">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg">Sessions</h3>
+                  <Button size="sm" onClick={createNewSession} className="rounded-lg">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-2">
+                  {sessions.map((session: ChatSession) => (
+                    <motion.div
+                      key={session.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Card
+                        className={cn(
+                          "p-4 cursor-pointer hover:shadow-md transition-all group",
+                          currentSession?.id === session.id && "bg-gray-100 border-black shadow-md"
+                        )}
+                        onClick={() => selectSession(session)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MessageSquare className={cn(
+                                "h-4 w-4",
+                                currentSession?.id === session.id ? "text-black" : "text-gray-500"
+                              )} />
+                              <p className="text-sm font-medium truncate">{session.title}</p>
+                            </div>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(session.last_message_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {currentSession?.id === session.id && (
+                              <ChevronRight className="h-4 w-4 text-primary" />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                              onClick={(e: React.MouseEvent) => deleteSession(session.id, e)}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Chat Container */}
+        <div 
+          className={cn("flex-1 flex", uploadedDocument ? "flex-row" : "flex-col")}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+        {/* Drop zone overlay */}
+        <AnimatePresence>
+          {isDragging && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-100/90 backdrop-blur-sm z-50 flex items-center justify-center"
+            >
+              <div className="bg-white rounded-2xl p-8 shadow-2xl border-2 border-dashed border-black">
+                <Upload className="h-16 w-16 text-black mx-auto mb-4" />
+                <p className="text-lg font-semibold">Drop your files here</p>
+                <p className="text-sm text-gray-600 mt-2">We support PDFs, documents, images, and more</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Document Viewer Panel */}
+        {uploadedDocument && (
+          <div className="w-1/2 border-r flex flex-col">
+            <div className="border-b px-4 py-3 bg-gray-50">
+              <h3 className="font-medium text-sm text-gray-700">{uploadedDocument.name}</h3>
+            </div>
+            <div className="flex-1">
+              <DocumentViewer
+                documentId={uploadedDocument.id}
+                documentUrl={uploadedDocument.url}
+                documentType={uploadedDocument.type}
+                pageCount={1}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Chat Panel */}
+        <div className={cn("flex flex-col", uploadedDocument ? "w-1/2" : "w-full")}>
+          {/* Header */}
+          <div className="border-b px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => setShowSidebar(!showSidebar)}
+              >
+                <Menu className="h-4 w-4" />
+                Sessions ({sessions.length})
+              </Button>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-black" />
+                AI Study Assistant
+              </h2>
+              <Badge variant="secondary">GPT-4 Powered</Badge>
+            </div>
+          </div>
+
+        {/* AI Tools Bar */}
+        <div className="border-b px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenSettingsModal('flashcards')}
+              disabled={isLoading}
+              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              Flashcards
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenSettingsModal('quiz')}
+              disabled={isLoading}
+              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
+            >
+              <Brain className="h-4 w-4" />
+              Quiz
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => generateContent('summary')}
+              disabled={isLoading}
+              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Summary
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => generateContent('notes')}
+              disabled={isLoading}
+              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
+            >
+              <StickyNote className="h-4 w-4" />
+              Study Notes
+            </Button>
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
+          <div className="py-4 max-w-4xl mx-auto">
+            {/* Landing page when no messages */}
+            {showLandingPage && messages.length === 0 && !isLoadingHistory && (
+              <div className="flex flex-col h-full min-h-[600px] bg-gradient-to-b from-white to-gray-50">
+                {/* Hero Section */}
+                <div className="text-center py-12 px-6">
+                  <motion.h1 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-black bg-clip-text text-transparent"
+                  >
+                    What would you like to learn today?
+                  </motion.h1>
+                  <motion.p 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="text-lg text-gray-600"
+                  >
+                    Upload your materials, paste content, or ask questions to get started
+                  </motion.p>
+                </div>
+
+                {/* Upload Options Grid */}
+                <div className="flex-1 max-w-5xl mx-auto px-6 w-full">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+                  >
+                    {/* Upload Files */}
+                    <Card 
+                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload className="h-8 w-8 text-black" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">Upload Files</h3>
+                        <p className="text-sm text-gray-600">PDFs, Documents, Images</p>
+                        <p className="text-xs text-gray-400 mt-2">Drag & drop supported</p>
+                      </div>
+                    </Card>
+
+                    {/* Paste Content */}
+                    <Card 
+                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group"
+                      onClick={() => setShowPasteModal(true)}
+                    >
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Link2 className="h-8 w-8 text-black" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">Paste Content</h3>
+                        <p className="text-sm text-gray-600">YouTube, Web links, Text</p>
+                        <p className="text-xs text-gray-400 mt-2">Smart content extraction</p>
+                      </div>
+                    </Card>
+
+                    {/* Record Audio */}
+                    <Card className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group">
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Mic className="h-8 w-8 text-black" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">Record Audio</h3>
+                        <p className="text-sm text-gray-600">Voice notes, Lectures</p>
+                        <p className="text-xs text-gray-400 mt-2">Live transcription</p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+
+
+                  {/* Recently Used / Suggested Topics */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-12 text-center"
+                  >
+                    <p className="text-sm text-gray-500 mb-4">Popular topics</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {['Biology', 'History', 'Mathematics', 'Literature', 'Physics', 'Chemistry'].map((topic) => (
+                        <Badge 
+                          key={topic}
+                          variant="secondary" 
+                          className="cursor-pointer hover:bg-black hover:text-white transition-colors"
+                          onClick={() => {
+                            setInput(`Teach me about ${topic}`);
+                            setShowLandingPage(false);
+                          }}
+                        >
+                          {topic}
+                        </Badge>
+                      ))}
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+            )}
+            
+            {/* Messages */}
+            <AnimatePresence>
+              {messages.map((message, index) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  className={cn(
+                    "mb-6 flex gap-3",
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  )}
+                >
+                  {message.role === 'assistant' && (
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className="bg-black text-white">
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  
+                  <div                     className={cn(
+                      "group relative max-w-[80%] rounded-2xl px-4 py-3",
+                      message.role === 'user' 
+                        ? 'bg-black text-white ml-12' 
+                        : 'bg-gray-100 text-gray-900 mr-12'
+                    )}>
+                    {/* Message content */}
+                    {message.isTyping ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-2 h-2 bg-gray-400 rounded-full"
+                              animate={{ y: [0, -10, 0] }}
+                              transition={{
+                                duration: 0.6,
+                                repeat: Infinity,
+                                delay: i * 0.1
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="prose prose-sm max-w-none">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                        
+                        {/* Flashcard View Button */}
+                        {message.role === 'assistant' && 
+                         message.content.includes('flashcards for you') && 
+                         currentFlashcards.length > 0 && (
+                          <div className="mt-3">
+                            <Button
+                              size="sm"
+                              onClick={() => setShowFlashcards(true)}
+                              className="flex items-center gap-2"
+                            >
+                              <Brain className="h-4 w-4" />
+                              View Flashcards ({currentFlashcards.length})
+                            </Button>
+                          </div>
+                        )}
+
+                        {message.role === 'assistant' && 
+                         message.content.includes('quiz questions for you') && 
+                         currentQuiz.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {/* Quiz Mode Selection */}
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-gray-600">Mode:</span>
+                              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                                <Button
+                                  variant={quizMode === 'multiple-choice' ? 'default' : 'ghost'}
+                                  size="sm"
+                                  onClick={() => setQuizMode('multiple-choice')}
+                                  className="h-7 px-3 text-xs"
+                                >
+                                  Multiple Choice
+                                </Button>
+                                <Button
+                                  variant={quizMode === 'free-answer' ? 'default' : 'ghost'}
+                                  size="sm"
+                                  onClick={() => setQuizMode('free-answer')}
+                                  className="h-7 px-3 text-xs"
+                                >
+                                  Free Answer
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {/* Take Quiz Button */}
+                            <Button
+                              size="sm"
+                              onClick={() => setShowQuiz(true)}
+                              className="flex items-center gap-2"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Take Quiz ({currentQuiz.length} questions)
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Attachments */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {message.attachments.map((attachment) => (
+                              <div key={attachment.id} className="flex items-center gap-2 p-2 bg-white/10 rounded-lg">
+                                <FileIcon className="h-4 w-4" />
+                                <span className="text-sm">{attachment.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Message metadata */}
+                        <div className={cn(
+                          "flex items-center gap-2 mt-2 text-xs",
+                          message.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                        )}>
+                          <Clock className="h-3 w-3" />
+                          {new Date(message.timestamp).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                          {message.status === 'sending' && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {message.status === 'sent' && <CheckCircle2 className="h-3 w-3" />}
+                          {message.status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" />}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Message actions */}
+                    {!message.isTyping && (
+                      <div className={cn(
+                        "absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity",
+                        message.role === 'user' && 'left-auto right-0'
+                      )}>
+                        {message.role === 'assistant' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => handleFeedback(message.id, 'positive')}
+                            >
+                              <ThumbsUp className={cn(
+                                "h-3 w-3",
+                                message.feedback === 'positive' && "fill-current"
+                              )} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => handleFeedback(message.id, 'negative')}
+                            >
+                              <ThumbsDown className={cn(
+                                "h-3 w-3",
+                                message.feedback === 'negative' && "fill-current"
+                              )} />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => copyMessage(message.content)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-7 px-2">
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Share2 className="h-4 w-4 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Download className="h-4 w-4 mr-2" />
+                              Export
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
+                  </div>
+
+                  {message.role === 'user' && (
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className="bg-gray-200">
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="border-t bg-white/80 backdrop-blur-sm px-4 py-4">
+          <div className="max-w-4xl mx-auto">
+            {/* File attachments preview */}
+            {attachments.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <div 
+                    key={attachment.id}
+                    className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {attachment.status === 'uploading' && (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>{attachment.name}</span>
+                        <Progress value={attachment.progress} className="w-20 h-1" />
+                      </>
+                    )}
+                    {attachment.status === 'processing' && (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-black" />
+                        <span>{attachment.name}</span>
+                        <span className="text-xs text-gray-500">Processing...</span>
+                      </>
+                    )}
+                    {attachment.status === 'ready' && (
+                      <>
+                        <FileIcon className="h-4 w-4 text-green-600" />
+                        <span>{attachment.name}</span>
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      </>
+                    )}
+                    {attachment.status === 'error' && (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-red-600">{attachment.name}</span>
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setAttachments(prev => prev.filter(a => a.id !== attachment.id))}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Input controls */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask anything..."
+                  className="min-h-[52px] max-h-[200px] pr-12 resize-none rounded-xl"
+                  disabled={isLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-2 bottom-2 h-8 w-8"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Attach files</TooltipContent>
+                </Tooltip>
+              </div>
+              <Button
+                onClick={sendMessage}
+                disabled={(!input.trim() && attachments.length === 0) || isLoading}
+                className="rounded-xl"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+              <span>Press Enter to send, Shift+Enter for new line</span>
+              <span>Powered by GPT-4</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={(e) => handleFileSelect(e.target.files)}
+          className="hidden"
+          multiple
+          accept=".txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.mp3,.mp4"
+        />
+        
+        {/* Flashcard Viewer Overlay */}
+        {showFlashcards && currentFlashcards.length > 0 && (
+          <div className="absolute inset-0 bg-white z-50 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-white">
+              <h2 className="text-xl font-semibold">Interactive Flashcards</h2>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowFlashcards(false)}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Back to Chat
+              </Button>
+            </div>
+            
+            {/* Flashcard Viewer */}
+            <div className="flex-1 overflow-hidden">
+              <StandaloneFlashcardViewer
+                flashcards={currentFlashcards.map((card: any) => ({
+                  question: card.question,
+                  answer: card.answer,
+                  difficulty_level: card.difficulty_level || 'medium',
+                  tags: card.tags || [],
+                  source_reference: {
+                    module: 'Current Chat Session',
+                    generated_at: new Date().toISOString(),
+                    ...(card.source_reference || {})
+                  }
+                }))}
+                title="Study Session Flashcards"
+                onShuffle={() => {
+                  const shuffled = [...currentFlashcards].sort(() => Math.random() - 0.5);
+                  setCurrentFlashcards(shuffled);
+                }}
+                onRegenerate={() => {
+                  setShowFlashcards(false);
+                  handleOpenSettingsModal('flashcards');
+                }}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Quiz Viewer Overlay */}
+        {showQuiz && currentQuiz.length > 0 && (
+          <div className="absolute inset-0 bg-white z-50 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-white">
+              <h2 className="text-xl font-semibold">Interactive Quiz</h2>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowQuiz(false)}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Back to Chat
+              </Button>
+            </div>
+            
+            {/* Quiz Viewer */}
+            <div className="flex-1 overflow-hidden">
+              <StandaloneQuizViewer
+                questions={currentQuiz.map((question: any) => ({
+                  question: question.question,
+                  options: question.options,
+                  correct: question.correct,
+                  explanation: question.explanation || '',
+                  difficulty_level: question.difficulty_level || 'medium',
+                  tags: question.tags || [],
+                  source_reference: {
+                    module: 'Current Chat Session',
+                    generated_at: new Date().toISOString(),
+                    ...(question.source_reference || {})
+                  }
+                }))}
+                title="Quiz Session"
+                mode={quizMode}
+                onModeChange={(mode) => setQuizMode(mode)}
+                onShuffle={() => {
+                  const shuffled = [...currentQuiz].sort(() => Math.random() - 0.5);
+                  setCurrentQuiz(shuffled);
+                }}
+                onRegenerate={() => {
+                  setShowQuiz(false);
+                  handleOpenSettingsModal('quiz');
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Paste Modal */}
+        {showPasteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <Card className="p-6 max-w-2xl w-full mx-4">
+              <h3 className="text-xl font-semibold mb-4">Paste Content</h3>
+              <Textarea
+                value={pasteInput}
+                onChange={(e) => setPasteInput(e.target.value)}
+                placeholder="Paste your content here (YouTube URL, web link, text, etc.)"
+                className="mb-4 min-h-[200px] text-base"
+              />
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowPasteModal(false);
+                    setPasteInput('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handlePasteContent} 
+                  disabled={!pasteInput.trim()}
+                  className="bg-black hover:bg-black/90"
+                >
+                  Add Content
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Generation Settings Modal */}
+        <GenerationSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          onGenerate={handleGenerateWithSettings}
+          type={settingsType}
+          isLoading={isGenerating}
+        />
+        
+        </div> {/* Close Chat Panel */}
+        </div> {/* Close Main Chat Container */}
+      </div> {/* Close outermost container */}
+    </TooltipProvider>
+  );
+}

@@ -589,13 +589,13 @@ export async function POST(
     
     switch (type) {
       case 'flashcards':
-        const numCards = options.num_cards || 5;
+        const numCards = options.num_cards || options.quantity || 5;
         generatedContent = await generateFlashcards(moduleContent, numCards);
         payload = { flashcards: generatedContent };
         break;
         
       case 'quiz':
-        const numQuestions = options.num_questions || 5;
+        const numQuestions = options.num_questions || options.quantity || 5;
         generatedContent = await generateQuiz(moduleContent, numQuestions);
         payload = { questions: generatedContent };
         break;
