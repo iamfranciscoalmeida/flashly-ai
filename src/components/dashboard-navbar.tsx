@@ -14,7 +14,7 @@ import {
   FileText,
   Sparkles,
   LayoutDashboard,
-  MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import UserProfile from "./user-profile";
@@ -46,7 +46,8 @@ export default function DashboardNavbar() {
                 variant={
                   isActive("/dashboard") &&
                   !isActive("/dashboard/study") &&
-                  !isActive("/dashboard/upload")
+                  !isActive("/dashboard/upload") &&
+                  !isActive("/dashboard/chat")
                     ? "default"
                     : "ghost"
                 }
@@ -55,6 +56,16 @@ export default function DashboardNavbar() {
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Dashboard</span>
+              </Button>
+            </Link>
+            <Link href="/dashboard/chat">
+              <Button
+                variant={isActive("/dashboard/chat") ? "default" : "ghost"}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>AI Chat</span>
               </Button>
             </Link>
             <Link href="/dashboard/study">
@@ -75,16 +86,6 @@ export default function DashboardNavbar() {
               >
                 <FileText className="h-4 w-4" />
                 <span>Upload</span>
-              </Button>
-            </Link>
-            <Link href="/dashboard/chat">
-              <Button
-                variant={isActive("/dashboard/chat") ? "default" : "ghost"}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <MessageCircle className="h-4 w-4" />
-                <span>Chat</span>
               </Button>
             </Link>
           </div>

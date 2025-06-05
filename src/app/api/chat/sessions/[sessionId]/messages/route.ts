@@ -1,57 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '../../../../../../supabase/server'
+import { createClient } from "@/supabase/server";
+import { NextResponse } from "next/server";
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const { sessionId } = params
+    const supabase = await createClient();
 
-    const supabase = await createClient()
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify session belongs to user
-    const { data: chatSession } = await supabase
-      .from('chat_sessions')
-      .select('id')
-      .eq('id', sessionId)
-      .eq('user_id', session.user.id)
-      .single()
+    const sessionId = params.sessionId;
 
-    if (!chatSession) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    // Verify the session belongs to the user
+    const { data: session, error: sessionError } = await supabase
+      .from("chat_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 }
+      );
     }
 
     // Get messages for the session
-    const { data: messages, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
+    const { data: messages, error: messagesError } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
 
-    if (error) {
-      console.error('Error fetching messages:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch messages' },
-        { status: 500 }
-      )
+    if (messagesError) {
+      throw messagesError;
     }
 
-    return NextResponse.json({ messages })
-
+    return NextResponse.json({
+      success: true,
+      messages: messages || []
+    });
   } catch (error) {
-    console.error('Error in messages route:', error)
+    console.error("Error fetching messages:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
-    )
+    );
   }
-} 
+}
