@@ -10,6 +10,7 @@ import ComparisonSection from "@/components/comparison-section";
 import RoadmapSection from "@/components/roadmap-section";
 import SocialProofSection from "@/components/social-proof-section";
 import EnhancedCtaFooter from "@/components/enhanced-cta-footer";
+import WaitlistDebug from "@/components/waitlist-debug";
 import { createClient } from "../../supabase/server";
 import {
   ArrowUpRight,
@@ -188,6 +189,15 @@ export default async function Home() {
 
       {/* Waitlist Benefits Section - Only show in waitlist mode */}
       {isWaitlistMode && <WaitlistBenefitsSection />}
+
+      {/* Debug Component - Only show in waitlist mode */}
+      {isWaitlistMode && (
+        <section className="py-12 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <WaitlistDebug />
+          </div>
+        </section>
+      )}
 
       {/* Conditional Pricing Section - Only show if not in waitlist mode */}
       {!isWaitlistMode && (

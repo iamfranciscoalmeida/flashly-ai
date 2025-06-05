@@ -33,11 +33,22 @@ export async function POST(request: NextRequest) {
 
     // Check environment variables
     console.log("🔍 Checking environment variables...");
-    console.log("NEXT_PUBLIC_SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Set" : "❌ Missing");
-    console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "✅ Set" : "❌ Missing");
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    console.log("NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
+    console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY:", supabaseAnonKey ? "✅ Set" : "❌ Missing");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("💥 Missing required environment variables");
+      return NextResponse.json(
+        { error: "Server configuration error. Please contact support." },
+        { status: 500 }
+      );
+    }
 
     const supabase = await createClient();
-    console.log("✅ Supabase client created");
+    console.log("✅ Supabase client created")
 
     // Insert into waitlist table
     console.log("💾 Attempting to insert into waitlist table...");
@@ -56,6 +67,7 @@ export async function POST(request: NextRequest) {
       console.error("Error code:", error.code);
       console.error("Error message:", error.message);
       console.error("Error details:", error.details);
+      console.error("Error hint:", error.hint);
       
       // Handle duplicate email error
       if (error.code === "23505" || error.message.includes("duplicate")) {
@@ -67,12 +79,23 @@ export async function POST(request: NextRequest) {
 
       // Handle table doesn't exist error
       if (error.code === "42P01" || error.message.includes("does not exist")) {
+        console.error("💥 Waitlist table does not exist in database");
         return NextResponse.json(
           { error: "Database table not found. Please contact support." },
           { status: 500 }
         );
       }
 
+      // Handle RLS policy errors
+      if (error.code === "42501" || error.message.includes("policy")) {
+        console.error("💥 Row Level Security policy blocking insert");
+        return NextResponse.json(
+          { error: "Database permission error. Please contact support." },
+          { status: 500 }
+        );
+      }
+
+      // Generic database error
       return NextResponse.json(
         { error: "Failed to join waitlist. Please try again." },
         { status: 500 }
@@ -91,6 +114,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("💥 Unexpected error in waitlist API:", error);
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+    console.error("Error name:", error instanceof Error ? error.name : "Unknown");
+    console.error("Error cause:", error instanceof Error ? error.cause : "No cause");
     
     return NextResponse.json(
       { error: "Internal server error" },

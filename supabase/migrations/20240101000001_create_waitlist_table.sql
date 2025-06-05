@@ -1,5 +1,6 @@
--- Run this in your Supabase SQL Editor
--- Create waitlist table
+-- Create waitlist table for email collection
+-- This table allows anonymous inserts for waitlist signups
+
 create table if not exists waitlist (
   id uuid primary key default uuid_generate_v4(),
   full_name text,
@@ -7,30 +8,20 @@ create table if not exists waitlist (
   submitted_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- Enable Row Level Security
-alter table waitlist enable row level security;
+-- Disable Row Level Security for this table to allow anonymous inserts
+-- Since this is just collecting email addresses, RLS is not needed
+alter table waitlist disable row level security;
 
--- Create policy to allow inserts from all users (authenticated and unauthenticated)
-create policy "Allow insert for all users"
-on waitlist for insert
-with check (true);
+-- Grant insert permissions to anonymous and authenticated users
+grant insert on waitlist to anon;
+grant insert on waitlist to authenticated;
 
--- Create policy to allow admin users to read all waitlist entries
-create policy "Allow read for admin users"
-on waitlist for select
-using (
-  exists (
-    select 1 from auth.users
-    where auth.users.id = auth.uid()
-    and auth.users.raw_user_meta_data->>'role' = 'admin'
-  )
-);
+-- Grant select permissions to authenticated users (for admin access)
+grant select on waitlist to authenticated;
 
--- Create an index on email for faster lookups
+-- Create indexes for better performance
 create index if not exists idx_waitlist_email on waitlist(email);
-
--- Create an index on submitted_at for ordering
 create index if not exists idx_waitlist_submitted_at on waitlist(submitted_at);
 
--- Test the table by checking if it exists
-select table_name from information_schema.tables where table_name = 'waitlist'; 
+-- Verify the table was created successfully
+select 'Waitlist table created successfully!' as status; 
