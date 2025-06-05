@@ -3,8 +3,18 @@ export type ChatSession = {
   user_id: string;
   document_id: string | null;
   module_id: string | null;
+  folder_id: string | null;
   title: string;
   last_message_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Folder = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
   created_at: string;
   updated_at: string;
 };

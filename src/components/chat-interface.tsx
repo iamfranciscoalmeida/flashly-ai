@@ -152,6 +152,14 @@ export function ChatInterface({
         </h2>
       </div>
 
+      {/* AI Toolbar */}
+      <AIToolbar
+        sessionId={sessionId}
+        documentId={documentId}
+        moduleId={moduleId}
+        onContentGenerated={onContentGenerated}
+      />
+
       {/* Messages Area */}
       <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
         <div className="py-4 space-y-4">
