@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { AIToolbar } from './ai-toolbar';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -112,6 +113,15 @@ export function ChatInterface({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+  };
+
+  const onContentGenerated = (type: string, content: any) => {
+    // Handle generated content - could add it as a message or trigger a callback
+    console.log('Content generated:', type, content);
+    // Optionally call the parent's onGenerateContent callback
+    if (type === 'flashcards' || type === 'quiz' || type === 'summary' || type === 'notes') {
+      onGenerateContent?.(type as 'flashcards' | 'quiz' | 'summary' | 'notes');
     }
   };
 

@@ -13,20 +13,28 @@ export async function POST(request: Request) {
     }
 
     // Parse request body
-    const { sessionId, documentId, moduleId, type, options } = await request.json();
+    const body = await request.json();
+    console.log("Received request body:", body);
+    const { sessionId, documentId, moduleId, type, options, content: providedContent } = body;
 
     if (!sessionId || !type) {
+      console.log("Missing required parameters:", { sessionId, type });
       return NextResponse.json(
         { error: "Session ID and type are required" },
         { status: 400 }
       );
     }
 
-    // Get document context if available
+    // Get content from multiple sources
     let content = "";
     let moduleTitle = "";
     
-    if (documentId) {
+    // Priority 1: Use provided content directly (for YouLearn-style)
+    if (providedContent) {
+      content = providedContent;
+    } 
+    // Priority 2: Get document content if available
+    else if (documentId) {
       // Get document text
       const { data: document } = await supabase
         .from("documents")
@@ -56,7 +64,7 @@ export async function POST(request: Request) {
         }
         
         // Apply page range if specified
-        if (options.pageRange && document.extracted_text) {
+        if (options?.pageRange && document.extracted_text) {
           // In a real implementation, extract specific pages
           // For now, we'll use a portion of the text
           const wordsPerPage = 300;
@@ -66,8 +74,9 @@ export async function POST(request: Request) {
           content = words.slice(startIndex, endIndex).join(' ');
         }
       }
-    } else {
-      // Get recent messages from the chat as context
+    } 
+    // Priority 3: Get recent messages from the chat as context
+    else {
       const { data: messages } = await supabase
         .from("messages")
         .select("content, role")
@@ -76,17 +85,19 @@ export async function POST(request: Request) {
         .limit(10);
 
       if (messages && messages.length > 0) {
-        // Combine recent messages as context
+        // Combine recent messages as context, filtering out system messages
         content = messages
           .reverse()
-          .map(m => `${m.role}: ${m.content}`)
+          .filter(m => m.role === 'user') // Only use user messages for content generation
+          .map(m => m.content)
           .join('\n\n');
       }
     }
 
-    if (!content) {
+    if (!content || content.trim().length < 50) {
+      console.log("No sufficient content available. Content length:", content.length);
       return NextResponse.json(
-        { error: "No content available to generate from" },
+        { error: "No sufficient content available to generate study materials. Please provide more detailed content or ask questions first." },
         { status: 400 }
       );
     }
