@@ -1,5 +1,6 @@
 import { TempoInit } from "@/components/tempo-init";
 import SyncSubscription from "@/components/sync-subscription";
+import { Analytics } from '@vercel/analytics/react';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
@@ -25,6 +26,7 @@ export default function RootLayout({
         {children}
         <TempoInit />
         <SyncSubscription />
+        <Analytics />
       </body>
     </html>
   );
