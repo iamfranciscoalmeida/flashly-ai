@@ -8,7 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Send, 
+  Sparkles, 
+  FileText, 
+  Brain, 
   BookOpen, 
+  StickyNote,
   Loader2,
   User,
   Bot
@@ -18,20 +22,19 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { AIToolbar } from './ai-toolbar';
 
 interface ChatInterfaceProps {
   sessionId: string;
   documentId?: string;
   moduleId?: string;
-  onContentGenerated?: (type: string, content: any) => void;
+  onGenerateContent?: (type: 'flashcards' | 'quiz' | 'summary' | 'notes') => void;
 }
 
 export function ChatInterface({ 
   sessionId, 
   documentId, 
   moduleId,
-  onContentGenerated
+  onGenerateContent 
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -111,6 +114,33 @@ export function ChatInterface({
       sendMessage();
     }
   };
+
+  const toolButtons = [
+    { 
+      icon: Sparkles, 
+      label: 'Generate Flashcards', 
+      type: 'flashcards' as const,
+      color: 'text-purple-600 hover:bg-purple-50'
+    },
+    { 
+      icon: Brain, 
+      label: 'Create Quiz', 
+      type: 'quiz' as const,
+      color: 'text-blue-600 hover:bg-blue-50'
+    },
+    { 
+      icon: FileText, 
+      label: 'Summarize', 
+      type: 'summary' as const,
+      color: 'text-green-600 hover:bg-green-50'
+    },
+    { 
+      icon: StickyNote, 
+      label: 'Study Notes', 
+      type: 'notes' as const,
+      color: 'text-orange-600 hover:bg-orange-50'
+    }
+  ];
 
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm">
@@ -215,6 +245,24 @@ export function ChatInterface({
           )}
         </div>
       </ScrollArea>
+
+      {/* Tool Buttons */}
+      <div className="border-t px-6 py-3">
+        <div className="flex gap-2 flex-wrap">
+          {toolButtons.map(({ icon: Icon, label, type, color }) => (
+            <Button
+              key={type}
+              variant="outline"
+              size="sm"
+              onClick={() => onGenerateContent?.(type)}
+              className={cn("flex items-center gap-2", color)}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       {/* Input Area */}
       <div className="border-t px-6 py-4">
