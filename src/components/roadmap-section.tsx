@@ -4,62 +4,62 @@ export default function RoadmapSection() {
   const roadmapItems = [
     {
       phase: "Beta Launch",
-      timeline: "Q1 2024",
+      timeline: "Q3 2025",
       status: "current",
       icon: <Calendar className="w-6 h-6" />,
       features: [
-        "Core AI flashcard generation",
-        "PDF upload & processing", 
-        "Basic study modes",
+        "PDF to Video conversion",
+        "Basic AI flashcard generation", 
+        "Voice AI tutoring foundation",
         "Web platform access"
       ]
     },
     {
       phase: "Public Launch", 
-      timeline: "Q2 2024",
+      timeline: "Q4 2025",
       status: "upcoming",
       icon: <Users className="w-6 h-6" />,
       features: [
-        "Advanced quiz generation",
-        "Progress analytics",
-        "Study streaks & gamification",
-        "Multiple file format support"
+        "Full voice AI tutor experience",
+        "Advanced video generation",
+        "Teacher collaboration tools",
+        "Student progress analytics"
       ]
     },
     {
       phase: "Mobile App",
-      timeline: "Q3 2024", 
+      timeline: "Q1 2026", 
       status: "planned",
       icon: <Smartphone className="w-6 h-6" />,
       features: [
         "iOS & Android apps",
-        "Offline study mode",
-        "Push notifications for reviews",
-        "Camera scanning of notes"
+        "Offline voice tutoring",
+        "Mobile video playback",
+        "Camera document scanning"
       ]
     },
     {
-      phase: "AI Tutoring",
-      timeline: "Q4 2024",
+      phase: "Advanced AI Features",
+      timeline: "Q2 2026",
       status: "planned", 
       icon: <Brain className="w-6 h-6" />,
       features: [
-        "Personalized AI tutor",
-        "Real-time help & explanations",
-        "Adaptive learning paths",
-        "Voice interaction mode"
+        "Multi-language voice support",
+        "Advanced personalization",
+        "Real-time adaptive learning",
+        "Interactive video elements"
       ]
     },
     {
-      phase: "Collaboration",
-      timeline: "2025",
+      phase: "Collaboration Suite",
+      timeline: "2026",
       status: "future",
       icon: <Cloud className="w-6 h-6" />,
       features: [
-        "Study group features",
-        "Google Drive/Notion integration", 
-        "Shared flashcard decks",
-        "Class collaboration tools"
+        "Classroom management tools",
+        "Google Drive/LMS integration", 
+        "Shared video libraries",
+        "Group study features"
       ]
     }
   ];

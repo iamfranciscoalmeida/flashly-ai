@@ -66,12 +66,11 @@ export default async function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">
-              Study Smarter, Not Harder
+              Revolutionary AI Learning Platform
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Our AI-powered platform transforms your study materials into
-              effective learning tools, helping you master any subject with
-              ease.
+              Experience the future of education with AI that converts PDFs to videos, 
+              provides voice tutoring, and offers intelligent support for students and teachers alike.
             </p>
           </div>
 
@@ -79,26 +78,26 @@ export default async function Home() {
             {[
               {
                 icon: <FileText className="w-6 h-6" />,
-                title: "Easy Document Upload",
+                title: "PDF to Video Learning",
                 description:
-                  "Upload PDFs and notes with a simple drag & drop interface",
+                  "Transform static PDFs into dynamic video lessons with AI narration",
               },
               {
                 icon: <Sparkles className="w-6 h-6" />,
-                title: "AI-Generated Flashcards",
+                title: "Voice AI Tutor",
                 description:
-                  "Turn any document into interactive study materials",
+                  "Interactive voice conversations with your personal AI learning assistant",
               },
               {
                 icon: <Brain className="w-6 h-6" />,
-                title: "Smart Quizzes",
-                description: "Test your knowledge with personalized quizzes",
+                title: "Intelligent Flashcards",
+                description: "AI-generated study materials adapted to your learning style",
               },
               {
                 icon: <BookOpen className="w-6 h-6" />,
-                title: "Spaced Repetition",
+                title: "Teacher & Student Tools",
                 description:
-                  "Optimize your learning with proven memory techniques",
+                  "Comprehensive platform serving both educators and learners",
               },
             ].map((feature, index) => (
               <div
@@ -117,21 +116,30 @@ export default async function Home() {
       {/* Problem-Solution Section */}
       <ProblemSolutionSection />
 
-      {/* Stats Section */}
+      {/* Product Focus Section */}
       <section className="py-20 bg-black text-white">
         <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Powered by Advanced AI Technology</h2>
+            <p className="text-gray-300 max-w-2xl mx-auto">
+              Transform your learning experience with cutting-edge AI that understands how you learn best
+            </p>
+          </div>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold mb-2">10,000+</div>
-              <div className="text-gray-300">Students Helped</div>
+              <div className="text-4xl font-bold mb-2">📄➡️🎥</div>
+              <div className="text-gray-300 font-semibold mb-2">PDF to Video</div>
+              <div className="text-gray-400 text-sm">Convert static documents into engaging video lessons</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">50,000+</div>
-              <div className="text-gray-300">Flashcards Generated</div>
+              <div className="text-4xl font-bold mb-2">🎙️🤖</div>
+              <div className="text-gray-300 font-semibold mb-2">Voice AI Tutoring</div>
+              <div className="text-gray-400 text-sm">Personal AI tutor that speaks and listens to you</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">95%</div>
-              <div className="text-gray-300">Improved Test Scores</div>
+              <div className="text-4xl font-bold mb-2">👥📚</div>
+              <div className="text-gray-300 font-semibold mb-2">Student & Teacher Support</div>
+              <div className="text-gray-400 text-sm">Intelligent assistance for both learning and teaching</div>
             </div>
           </div>
         </div>
@@ -143,8 +151,8 @@ export default async function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Transform your study materials into effective learning tools in
-              just a few steps
+              Experience next-generation AI learning that adapts to your needs
+              and transforms how you study
             </p>
           </div>
 
@@ -154,10 +162,10 @@ export default async function Home() {
                 <span className="text-black text-xl font-bold">1</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">
-                Upload Your Materials
+                Upload & Transform
               </h3>
               <p className="text-gray-600">
-                Simply upload your PDF notes, textbooks, or study guides
+                Upload your PDFs and watch them transform into engaging video lessons
               </p>
             </div>
 
@@ -165,9 +173,9 @@ export default async function Home() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-black text-xl font-bold">2</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">AI Processing</h3>
+              <h3 className="text-xl font-semibold mb-3">Voice Interaction</h3>
               <p className="text-gray-600">
-                Our AI analyzes your content and extracts key concepts
+                Ask questions and get explanations through natural voice conversations
               </p>
             </div>
 
@@ -175,9 +183,9 @@ export default async function Home() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-black text-xl font-bold">3</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Study & Learn</h3>
+              <h3 className="text-xl font-semibold mb-3">Master Content</h3>
               <p className="text-gray-600">
-                Practice with flashcards and quizzes tailored to your materials
+                Use AI-powered flashcards and personalized tutoring to master any subject
               </p>
             </div>
           </div>

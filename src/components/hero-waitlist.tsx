@@ -27,23 +27,23 @@ export default function HeroWaitlist() {
               </h1>
 
               <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Join the waitlist and be first to try flashcards, quizzes, and 
-                smart study sessions with AI. Transform your notes into interactive 
-                learning materials.
+                Join the waitlist for revolutionary AI-powered learning. Transform PDFs into videos, 
+                chat with your personal AI tutor, and get intelligent assistance for both 
+                students and teachers.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-8 items-center justify-center lg:justify-start mb-12">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Check className="w-5 h-5 text-green-500" />
-                  <span>AI-generated flashcards</span>
+                  <span>PDF to Video conversion</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Check className="w-5 h-5 text-green-500" />
-                  <span>Smart quizzes</span>
+                  <span>Voice AI tutoring</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Check className="w-5 h-5 text-green-500" />
-                  <span>Spaced repetition</span>
+                  <span>Student & teacher tools</span>
                 </div>
               </div>
 
