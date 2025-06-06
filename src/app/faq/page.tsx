@@ -18,18 +18,18 @@ export default function FAQ() {
   const faqs: FAQItem[] = [
     // General Questions
     {
-      question: "What is Flashly AI and how does it work?",
-      answer: "Flashly AI is an AI-powered learning platform that transforms your study materials into interactive learning experiences. Upload your PDFs and our AI converts them into engaging video lessons, creates intelligent flashcards, and provides voice-based tutoring to enhance your learning.",
+      question: "What is StudyWithAI and how does it work?",
+      answer: "StudyWithAI is an AI-powered learning platform that transforms your study materials into interactive learning experiences. Upload your PDFs and our AI converts them into engaging video lessons, creates intelligent flashcards, and provides voice-based tutoring to enhance your learning.",
       category: "general"
     },
     {
-      question: "Who can use Flashly AI?",
-      answer: "Flashly AI is designed for students of all levels, educators, and lifelong learners. Whether you're in high school, college, graduate school, or pursuing professional development, our platform adapts to your learning needs.",
+      question: "Who can use StudyWithAI?",
+      answer: "StudyWithAI is designed for students of all levels, educators, and lifelong learners. Whether you're in high school, college, graduate school, or pursuing professional development, our platform adapts to your learning needs.",
       category: "general"
     },
     {
-      question: "How is Flashly AI different from other study platforms?",
-      answer: "Unlike traditional study platforms, Flashly AI offers unique features like PDF-to-video conversion, voice AI tutoring, and intelligent content analysis. Our AI doesn't just create generic study materials—it understands your content and creates personalized learning experiences.",
+      question: "How is StudyWithAI different from other study platforms?",
+      answer: "Unlike traditional study platforms, StudyWithAI offers unique features like PDF-to-video conversion, voice AI tutoring, and intelligent content analysis. Our AI doesn't just create generic study materials—it understands your content and creates personalized learning experiences.",
       category: "general"
     },
 
@@ -173,7 +173,7 @@ export default function FAQ() {
             Frequently Asked Questions
           </h1>
           <p className="text-gray-600">
-            Find answers to common questions about Flashly AI's features and services
+            Find answers to common questions about StudyWithAI's features and services
           </p>
         </div>
 

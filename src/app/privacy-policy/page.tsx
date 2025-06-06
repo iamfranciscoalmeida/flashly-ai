@@ -150,10 +150,6 @@ export default function PrivacyPolicy() {
               <p>
                 If you have any questions about this Privacy Policy or our practices, please contact us at:
               </p>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p><strong>Email:</strong> privacy@flashly.ai</p>
-                <p><strong>Address:</strong> [Your Company Address]</p>
-              </div>
             </div>
           </section>
         </div>

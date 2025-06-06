@@ -213,7 +213,7 @@ export default function TermsOfService() {
             </h2>
             <div className="text-gray-700 space-y-4">
               <p>
-                These terms are governed by the laws of [Your Jurisdiction]. Any disputes will be resolved 
+                These terms are governed by the laws. Any disputes will be resolved 
                 through binding arbitration, except for claims of intellectual property infringement.
               </p>
             </div>
@@ -227,10 +227,6 @@ export default function TermsOfService() {
               <p>
                 If you have questions about these Terms of Service, please contact us:
               </p>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p><strong>Email:</strong> legal@flashly.ai</p>
-                <p><strong>Address:</strong> [Your Company Address]</p>
-              </div>
             </div>
           </section>
         </div>
