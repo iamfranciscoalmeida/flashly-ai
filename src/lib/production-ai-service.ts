@@ -456,7 +456,7 @@ Content: ${content.substring(0, 2000)}...`;
     // Parse based on format
     if (format === 'outline') {
       const romanNumeralRegex = /^(I{1,3}V?|IV|V|VI{0,3}|IX|X)\.\s+(.+)$/gm;
-      const matches = content.matchAll(romanNumeralRegex);
+      const matches = Array.from(content.matchAll(romanNumeralRegex));
       
       for (const match of matches) {
         sections.push({
@@ -480,7 +480,7 @@ Content: ${content.substring(0, 2000)}...`;
   private static extractKeyPoints(content: string): string[] {
     const bulletRegex = /^[•○▪→]\s+(.+)$/gm;
     const points: string[] = [];
-    const matches = content.matchAll(bulletRegex);
+    const matches = Array.from(content.matchAll(bulletRegex));
     
     for (const match of matches) {
       if (match[1] && match[1].length > 10) {
