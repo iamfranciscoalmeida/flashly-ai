@@ -11,8 +11,6 @@ import {
 import { Button } from "./ui/button";
 import {
   Home,
-  FileText,
-  Sparkles,
   LayoutDashboard,
   MessageSquare,
 } from "lucide-react";
@@ -45,8 +43,6 @@ export default function DashboardNavbar() {
               <Button
                 variant={
                   isActive("/dashboard") &&
-                  !isActive("/dashboard/study") &&
-                  !isActive("/dashboard/upload") &&
                   !isActive("/dashboard/chat")
                     ? "default"
                     : "ghost"
@@ -68,26 +64,7 @@ export default function DashboardNavbar() {
                 <span>AI Chat</span>
               </Button>
             </Link>
-            <Link href="/dashboard/study">
-              <Button
-                variant={isActive("/dashboard/study") ? "default" : "ghost"}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Study</span>
-              </Button>
-            </Link>
-            <Link href="/dashboard/upload">
-              <Button
-                variant={isActive("/dashboard/upload") ? "default" : "ghost"}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <FileText className="h-4 w-4" />
-                <span>Upload</span>
-              </Button>
-            </Link>
+
           </div>
         </div>
         <div className="flex gap-4 items-center">
