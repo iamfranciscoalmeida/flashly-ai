@@ -58,7 +58,14 @@ Requirements:
    - **Short worked examples** only if they contain a core concept (e.g. "Given a right triangle with sides 3 and 4, what is the hypotenuse?").
    - **Critical distinctions** (e.g. "How does mitosis differ from meiosis?").
 
-3. **JSON format**: Return exactly one JSON array whose elements are objects with the following structure:
+3. **CRITICAL: Avoid Book-Specific References**:
+   - **NEVER reference specific book examples, figures, equations, or sections** (e.g., "Eq. 7.9", "Figure 3.2", "Example 4.1", "according to Section 2.3").
+   - **Create novel, self-contained examples** from your knowledge base instead of referencing book examples.
+   - **If the content mentions specific examples or figures, create new examples** that illustrate the same concepts.
+   - **All questions and answers must be complete and understandable** without needing to reference external materials.
+   - **Use your own knowledge** to provide concrete examples, formulas, and illustrations of concepts.
+
+4. **JSON format**: Return exactly one JSON array whose elements are objects with the following structure:
    [
      {
        "question": "<a clear, concise question that tests a single concept or fact>",
@@ -73,30 +80,35 @@ Requirements:
    - Do **not** wrap your JSON in any additional text or markup (no code fences, no explanatory sentences—only raw JSON).
    - Make sure every object has both "question" and "answer" keys.
 
-4. **Card density & depth**:
+5. **Card density & depth**:
    - Aim for one flashcard per distinct concept or formula. If a paragraph introduces two separate ideas, split them into two cards.
    - Generate approximately ${numCards} flashcards, focusing on the most important concepts.
 
-5. **Examples of bad flashcards** (you must not produce these):
+6. **Examples of bad flashcards** (you must not produce these):
    - Q: "What are the learning objectives of this section?"  
      A: "1. Understand X. 2. Learn Y. 3. Be able to solve Z."  
      ㊉ (This comes directly from a "Learning Objectives" box—skip it.)
    - Q: "What does the margin note say about mitochondria?"  
      A: "It just says mitochondria produce energy."  
      ㊉ (Margin notes often repeat textbook jargon—skip unless it is the only occurrence of that definition.)
+   - Q: "What is the significance of the formula from Eq. 7.9 in neural networks?"  
+     A: "..."  
+     ㊉ (References specific equation numbers that users cannot see.)
 
-6. **Examples of good flashcards**:
+7. **Examples of good flashcards**:
    - Q: "What is the chemical equation for photosynthesis?"  
      A: "6 CO₂ + 6 H₂O → C₆H₁₂O₆ + 6 O₂"  
    - Q: "Define osmosis."  
      A: "Osmosis is the passive movement of water molecules across a semipermeable membrane from lower‐solute to higher‐solute concentration."  
    - Q: "List the three main steps of cellular respiration."  
      A: "- Glycolysis\\n- Krebs cycle\\n- Electron transport chain"
+   - Q: "What is the backpropagation algorithm in neural networks?"  
+     A: "Backpropagation is a supervised learning algorithm that calculates gradients by propagating errors backward through the network layers to update weights and minimize the loss function."
 
 Now process this module text:
 ${moduleText}
 
-Generate approximately ${numCards} flashcards accordingly, skipping the irrelevant "fluff" sections and focusing only on the content that could realistically appear on a test. Output strictly valid JSON as described above—no extra commentary.`;
+Generate approximately ${numCards} flashcards accordingly, skipping the irrelevant "fluff" sections and focusing only on the content that could realistically appear on a test. Create novel examples from your knowledge base rather than referencing book-specific content. Output strictly valid JSON as described above—no extra commentary.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -104,7 +116,7 @@ Generate approximately ${numCards} flashcards accordingly, skipping the irreleva
       messages: [
         { 
           role: "system", 
-          content: "You are an expert educational AI that generates high-quality flashcards from textbook content. You must return only valid JSON with no additional formatting or text."
+          content: "You are an expert educational AI that generates high-quality flashcards from textbook content. You must return only valid JSON with no additional formatting or text. NEVER reference specific book examples, figures, equations, or sections that users cannot see."
         },
         { 
           role: "user", 
@@ -135,7 +147,7 @@ Generate approximately ${numCards} flashcards accordingly, skipping the irreleva
         messages: [
           { 
             role: "system", 
-            content: "You are an expert educational AI that generates high-quality flashcards from textbook content. You must return only valid JSON with no additional formatting or text."
+            content: "You are an expert educational AI that generates high-quality flashcards from textbook content. You must return only valid JSON with no additional formatting or text. NEVER reference specific book examples, figures, equations, or sections that users cannot see."
           },
           { 
             role: "user", 
@@ -225,7 +237,14 @@ Requirements:
    - **Step‐by‐step procedures**
    - **Critical distinctions between concepts**
 
-3. **JSON format**: Return exactly one JSON array whose elements are objects with the following structure:
+3. **CRITICAL: Avoid Book-Specific References**:
+   - **NEVER reference specific book examples, figures, equations, or sections** (e.g., "Eq. 7.9", "Figure 3.2", "Example 4.1", "according to Section 2.3").
+   - **Create novel, self-contained examples** from your knowledge base instead of referencing book examples.
+   - **If the content mentions specific examples or figures, create new examples** that illustrate the same concepts.
+   - **All questions and answers must be complete and understandable** without needing to reference external materials.
+   - **Use your own knowledge** to provide concrete examples, formulas, and illustrations of concepts.
+
+4. **JSON format**: Return exactly one JSON array whose elements are objects with the following structure:
    [
      {
        "stem": "<clear question stem>",
@@ -235,20 +254,28 @@ Requirements:
      ...
    ]
    - Do **not** wrap your JSON in any additional text or markup.
-   - Make sure every object has "stem", "choices", and "correct" keys.
-   - Choices should be an array of exactly 4 options.
-   - Correct should be a single letter (A, B, C, or D).
 
-4. **Question quality**:
-   - Make questions challenging but fair
-   - Avoid trick questions or overly obscure details
-   - Include plausible wrong answers (distractors)
-   - Generate approximately ${numQuestions} questions
+5. **Quality guidelines**:
+   - Make all answer choices plausible but only one definitively correct
+   - Avoid "all of the above" or "none of the above" unless truly appropriate
+   - Create distractors that test common misconceptions
+   - Ensure questions test understanding, not just memorization
+   - When referencing formulas or concepts, state them explicitly rather than using equation numbers
+
+6. **Examples of bad questions** (you must not produce these):
+   - "What is shown in Figure 2.1?" (References unavailable figure)
+   - "According to Equation 7.9, what happens when..." (References specific equation number)
+   - "In the example from Section 4.2..." (References specific book section)
+
+7. **Examples of good questions**:
+   - "What is the derivative of x² with respect to x?"
+   - "Which algorithm is commonly used for training neural networks by adjusting weights based on error gradients?"
+   - "What happens to the resistance in a circuit when resistors are connected in parallel?"
 
 Now process this module text:
 ${moduleText}
 
-Generate approximately ${numQuestions} high-quality multiple choice questions. Output strictly valid JSON as described above—no extra commentary.`;
+Generate approximately ${numQuestions} high-quality multiple choice questions, focusing on test-worthy concepts and creating novel examples from your knowledge base. Output strictly valid JSON as described above—no extra commentary.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -256,7 +283,7 @@ Generate approximately ${numQuestions} high-quality multiple choice questions. O
       messages: [
         { 
           role: "system", 
-          content: "You are an expert educational AI that generates high-quality quiz questions from textbook content. You must return only valid JSON with no additional formatting or text."
+          content: "You are an expert educational AI that generates high-quality quiz questions from textbook content. You must return only valid JSON with no additional formatting or text. NEVER reference specific book examples, figures, equations, or sections that users cannot see."
         },
         { 
           role: "user", 
@@ -287,7 +314,7 @@ Generate approximately ${numQuestions} high-quality multiple choice questions. O
         messages: [
           { 
             role: "system", 
-            content: "You are an expert educational AI that generates high-quality quiz questions from textbook content. You must return only valid JSON with no additional formatting or text."
+            content: "You are an expert educational AI that generates high-quality quiz questions from textbook content. You must return only valid JSON with no additional formatting or text. NEVER reference specific book examples, figures, equations, or sections that users cannot see."
           },
           { 
             role: "user", 

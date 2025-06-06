@@ -43,6 +43,39 @@ function estimateTokenCount(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+function generateContentGuidelines(type: 'flashcard' | 'quiz'): string {
+  const baseGuidelines = `
+CRITICAL INSTRUCTIONS FOR CONTENT GENERATION:
+1. **NEVER reference specific book examples, figures, equations, or sections** (e.g., "Eq. 7.9", "Figure 3.2", "Example 4.1", "Section 2.3"). Users cannot see these references.
+2. **Create novel, self-contained examples** from your knowledge base instead of referencing book examples.
+3. **If the content mentions specific examples or figures, create new examples** that illustrate the same concepts.
+4. **All questions and answers must be complete and understandable** without needing to reference external materials.
+5. **Use your own knowledge** to provide concrete examples, formulas, and illustrations of concepts.
+
+TRANSFORMATION EXAMPLES:
+- Instead of "What is the significance of Eq. 7.9?" → "What is the backpropagation formula and how does it work in neural networks?"
+- Instead of "According to Figure 3.2..." → "Consider a simple neural network with one hidden layer..."
+- Instead of "As shown in Example 4.1..." → "For example, if we have a dataset with features X and labels Y..."
+- Instead of "The 4-gram model in some examples..." → "A 4-gram language model analyzes sequences of 4 consecutive words to predict the next word..."
+`;
+
+  if (type === 'flashcard') {
+    return baseGuidelines + `
+FLASHCARD-SPECIFIC GUIDELINES:
+- When explaining concepts, provide novel examples that you create, not book references
+- If formulas are mentioned, state them explicitly rather than referencing equation numbers
+- Create concrete scenarios to illustrate abstract concepts
+- Include step-by-step explanations when appropriate`;
+  } else {
+    return baseGuidelines + `
+QUIZ-SPECIFIC GUIDELINES:
+- When referencing formulas or concepts, state them explicitly rather than using equation numbers
+- Create novel examples in both questions and answer choices
+- Make sure distractors are plausible but test understanding of the actual concept
+- Include practical applications rather than book-specific scenarios`;
+  }
+}
+
 // Smart content compression
 async function compressContentForGeneration(
   content: string,
@@ -217,6 +250,8 @@ ${compressedContent}
 
 IMPORTANT: Respond with ONLY a JSON array of flashcards. No additional text or explanation.
 
+${generateContentGuidelines('flashcard')}
+
 Required JSON format:
 [
   {
@@ -231,15 +266,17 @@ Guidelines:
 - Create questions that test understanding, not just memorization
 - Include a mix of concept questions, application questions, and analysis questions  
 - Make answers detailed and educational
-- Use content-specific terminology and examples
+- Use content-specific terminology and examples FROM YOUR KNOWLEDGE BASE
 - Ensure each flashcard is complete and self-contained
+- When explaining concepts, provide novel examples that you create, not book references
+- If formulas are mentioned, state them explicitly rather than referencing equation numbers
 ${difficulty === 'mixed' ? '- Vary complexity to match the requested difficulty distribution' : ''}
 
 Generate the JSON array now:`;
 
     try {
       const response = await createChatCompletion([
-        { role: 'system', content: 'You are an expert educator creating study materials. Always respond with valid JSON only, no additional text.' },
+        { role: 'system', content: 'You are an expert educator creating study materials. Always respond with valid JSON only, no additional text. NEVER reference specific book examples, figures, equations, or sections that users cannot see. Instead, create novel examples from your knowledge base.' },
         { role: 'user', content: prompt }
       ], {
         max_tokens: 2000,
@@ -320,6 +357,8 @@ ${compressedContent}
 
 IMPORTANT: Respond with ONLY a JSON array of quiz questions. No additional text or explanation.
 
+${generateContentGuidelines('quiz')}
+
 Required JSON format:
 [
   {
@@ -337,15 +376,17 @@ Guidelines:
 - Make all options plausible (good distractors)
 - Ensure the correct answer is definitively correct
 - Include detailed explanations for learning
-- Use content-specific terminology and examples
+- Use content-specific terminology and examples FROM YOUR KNOWLEDGE BASE
 - Test comprehension, application, and analysis
+- When explaining concepts, provide novel examples that you create, not book references
+- If formulas are mentioned, state them explicitly rather than referencing equation numbers
 ${difficulty === 'mixed' ? '- Vary complexity to match the requested difficulty distribution' : ''}
 
 Generate the JSON array now:`;
 
     try {
       const response = await createChatCompletion([
-        { role: 'system', content: 'You are an expert educator creating quiz questions. Always respond with valid JSON only, no additional text.' },
+        { role: 'system', content: 'You are an expert educator creating quiz questions. Always respond with valid JSON only, no additional text. NEVER reference specific book examples, figures, equations, or sections that users cannot see. Instead, create novel examples from your knowledge base.' },
         { role: 'user', content: prompt }
       ], {
         max_tokens: 2000,

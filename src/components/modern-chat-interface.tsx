@@ -604,6 +604,18 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
     }
   }, [input]);
 
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        setTimeout(() => {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }, 100);
+      }
+    }
+  }, [messages]);
+
   // File upload handlers
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
@@ -1668,9 +1680,9 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
         )}
 
         {/* Chat Panel */}
-        <div className={cn("flex flex-col", uploadedDocument ? "w-1/2" : "w-full")}>
+        <div className={cn("flex flex-col h-full", uploadedDocument ? "w-1/2" : "w-full")}>
           {/* Header */}
-          <div className="border-b px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-sm">
+          <div className="border-b px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-sm flex-shrink-0">
             <div className="flex items-center gap-4">
               {/* Only show Sessions button in header when NOT in PDF mode */}
               {!uploadedDocument && (
@@ -1693,7 +1705,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           </div>
 
         {/* AI Tools Bar */}
-        <div className="border-b px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100">
+        <div className="border-b px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
           <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
@@ -1738,8 +1750,9 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           </div>
         </div>
 
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
+        {/* Messages Area - Takes remaining space */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full px-4" ref={scrollAreaRef}>
           <div className="py-4 max-w-4xl mx-auto">
             {/* Landing page when no messages */}
             {showLandingPage && messages.length === 0 && !isLoadingHistory && (
@@ -2056,9 +2069,10 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
             </AnimatePresence>
           </div>
         </ScrollArea>
+        </div>
 
-        {/* Input Area */}
-        <div className="border-t bg-white/80 backdrop-blur-sm px-4 py-4">
+        {/* Input Area - Sticky at bottom */}
+        <div className="border-t bg-white/80 backdrop-blur-sm px-4 py-4 flex-shrink-0">
           <div className="max-w-4xl mx-auto">
             {/* File attachments preview */}
             {attachments.length > 0 && (
