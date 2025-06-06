@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { EnhancedFlashcard, EnhancedQuiz } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { formatForPreWrap } from '@/utils/text-formatting';
 
 interface ContentGeneratorProps {
   open: boolean;
@@ -210,7 +211,7 @@ export function ContentGenerator({
         <Card className="p-4">
           <ScrollArea className="h-[400px]">
             <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-              {text}
+              {formatForPreWrap(text)}
             </div>
           </ScrollArea>
         </Card>

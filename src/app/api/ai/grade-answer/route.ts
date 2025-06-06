@@ -50,29 +50,37 @@ async function gradeAnswerWithAI(
   correctness: 'correct' | 'partial' | 'incorrect';
 }> {
   try {
-    const prompt = `You are an expert educational AI grader. Grade the following student answer on a scale of 0-100.
+    const prompt = `
+    You are an expert educational AI grader. Your task is to evaluate the student’s answer on a scale from 0 to 100, based primarily on how well it captures the essential concepts of the correct answer—even if the wording differs. Be fair and thorough, giving partial credit for answers that demonstrate understanding of some, but not all, of the core ideas.
 
-Question: ${question}
+    Below are the details:
 
-Correct Answer: ${correctAnswer}
+    Question:
+    ${question}
 
-Student Answer: ${userAnswer}
+    Correct Answer (model/reference):
+    ${correctAnswer}
 
-${explanation ? `Additional Context/Explanation: ${explanation}` : ''}
+    Student Answer:
+    ${userAnswer}
 
-Provide a detailed assessment that includes:
-1. A score from 0-100
-2. Constructive feedback explaining what was correct/incorrect
-3. Whether the answer is correct, partially correct, or incorrect
+    ${explanation ? `Additional Context/Explanation: ${explanation}` : ''}
 
-Be fair but thorough. Give partial credit for answers that contain some correct elements even if incomplete.
+    Grading Instructions:
+    1. Identify the key concepts or facts from the “Correct Answer.”  
+    2. Check whether the student’s wording, even if phrased differently, conveys those same concepts.  
+    3. Do not penalize minor omissions of filler words (e.g., “a,” “the”) or simple paraphrases.  
+    4. If the student mentions most or all of the core ideas—though perhaps in fewer words—consider award­ing full credit (or near-full credit).  
+    5. If the student captures some but not all of the core ideas, assign partial credit in proportion to how many concepts are correctly stated.  
+    6. If the student’s answer is unrelated or fundamentally incorrect, score accordingly low.  
+    7. Provide constructive feedback that points out which concepts were correctly identified, which were missing or incorrect, and how to improve.  
 
-Respond in the following JSON format:
-{
-  "score": [0-100],
-  "feedback": "Detailed explanation of the grading",
-  "correctness": "correct" | "partial" | "incorrect"
-}`;
+    Output (STRICTLY in JSON):
+    {
+      "score": [0-100],
+      "feedback": "Detailed, constructive feedback—what was correct, what was missing or unclear, and why",
+      "correctness": "correct" | "partial" | "incorrect"
+    }`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4",

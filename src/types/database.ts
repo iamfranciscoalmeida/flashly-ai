@@ -125,3 +125,54 @@ export type EnhancedQuiz = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+// Smart Collections Types
+export type SmartCollection = {
+  id: string;
+  user_id: string;
+  title: string;
+  subject: string | null;
+  topic: string | null;
+  color_theme: string;
+  subject_icon: string;
+  ai_confidence_score: number;
+  auto_organized: boolean;
+  last_studied_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollectionItemType = 'flashcard' | 'quiz' | 'document' | 'chat_content';
+export type CollectionSourceType = 'document_upload' | 'chat_session' | 'manual';
+
+export type CollectionItem = {
+  id: string;
+  collection_id: string;
+  item_type: CollectionItemType;
+  item_id: string;
+  source_type: CollectionSourceType;
+  source_id: string | null;
+  relevance_score: number;
+  added_at: string;
+};
+
+export type CollectionAnalytic = {
+  id: string;
+  collection_id: string;
+  user_id: string;
+  metric_type: 'study_time' | 'items_reviewed' | 'accuracy_rate' | 'session_count';
+  metric_value: number;
+  recorded_date: string;
+  created_at: string;
+};
+
+// Enhanced types with collection metadata
+export type SmartCollectionWithStats = SmartCollection & {
+  flashcard_count: number;
+  quiz_count: number;
+  document_count: number;
+  chat_content_count: number;
+  total_items: number;
+  recent_activity?: string;
+  study_streak?: number;
+};

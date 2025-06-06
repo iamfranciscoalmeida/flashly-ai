@@ -1,35 +1,16 @@
--- Enable RLS
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Create the study-documents bucket if it doesn't exist
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'study-documents',
+  'study-documents', 
+  false,
+  52428800, -- 50MB limit
+  ARRAY['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+)
+ON CONFLICT (id) DO UPDATE SET
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Create policies for storage.objects
-CREATE POLICY "Users can upload their own files"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'study-documents' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "Users can view their own files"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'study-documents' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "Users can update their own files"
-ON storage.objects FOR UPDATE
-TO authenticated
-USING (
-  bucket_id = 'study-documents' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "Users can delete their own files"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'study-documents' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-); 
+-- Note: Storage policies for the 'study-documents' bucket should be configured
+-- through the Supabase dashboard under Storage > Policies
+-- or through the Supabase CLI/API, not through direct SQL migrations. 

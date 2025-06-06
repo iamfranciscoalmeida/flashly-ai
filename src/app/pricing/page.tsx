@@ -48,7 +48,7 @@ export default async function Pricing() {
           </p>
           <a
             href="mailto:sales@studywithai.io"
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
           >
             Contact Sales
           </a>

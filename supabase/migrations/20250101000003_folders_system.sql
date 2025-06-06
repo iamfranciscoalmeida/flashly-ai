@@ -16,13 +16,31 @@ ADD COLUMN IF NOT EXISTS folder_id UUID REFERENCES folders(id) ON DELETE SET NUL
 CREATE INDEX idx_folders_user_id ON folders(user_id);
 CREATE INDEX idx_chat_sessions_folder_id ON chat_sessions(folder_id);
 
+ALTER TABLE folders
+  ADD COLUMN IF NOT EXISTS color VARCHAR(7) NOT NULL
+    DEFAULT '#6B7280';
+
 -- Enable Row Level Security
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for folders
-CREATE POLICY "Users can view their own folders" ON folders
-  FOR ALL USING (auth.uid() = user_id);
-
+-- “Check‐then‐create” approach:
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_policies
+     WHERE schemaname = 'public'
+       AND tablename  = 'folders'
+       AND policyname = 'Users can view their own folders'
+  ) THEN
+    CREATE POLICY "Users can view their own folders"
+      ON folders
+      FOR ALL
+      USING ( auth.uid() = user_id );
+  END IF;
+END;
+$$;
 -- Create default "General" folder for existing users
 INSERT INTO folders (user_id, name, color)
 SELECT DISTINCT user_id, 'General', '#6B7280'

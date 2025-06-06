@@ -167,11 +167,21 @@ export default function FileUpload({
       return;
     }
 
-    // Get user to check plan limits
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+          // Get user to check plan limits and refresh session
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setUploadError("Please log in to upload files.");
+        return;
+      }
+
+      // Refresh session to ensure valid token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setUploadError("Session expired. Please refresh the page and try again.");
+        return;
+      }
 
     // Get upload limit based on plan
     const uploadLimit = user.user_metadata?.limits?.uploads || 1;
@@ -301,16 +311,37 @@ export default function FileUpload({
     } catch (error: any) {
       console.error("Error uploading file:", error);
       
+      // Enhanced error logging for debugging
+      console.error("Full error details:", {
+        message: error.message,
+        status: error.status || error.statusCode,
+        code: error.code,
+        name: error.name,
+        stack: error.stack,
+        error: error
+      });
+      
       // Set user-friendly error messages
       let errorMessage = "An error occurred while uploading your file.";
       
-      if (error.message?.includes('exceeded the maximum allowed size') || 
+      // Handle specific error types
+      if (error.status === 400 || error.statusCode === 400) {
+        errorMessage = "Upload failed due to invalid request. This might be due to authentication issues or storage configuration. Please try logging out and back in, or contact support.";
+      } else if (error.status === 401 || error.statusCode === 401) {
+        errorMessage = "Authentication failed. Please log out and log back in to refresh your session.";
+      } else if (error.status === 403 || error.statusCode === 403) {
+        errorMessage = "Permission denied. You don't have permission to upload to this location.";
+      } else if (error.message?.includes('exceeded the maximum allowed size') || 
           error.message?.includes('Payload too large')) {
         errorMessage = `File is too large (${(file.size / 1024 / 1024).toFixed(2)} MB). The maximum file size allowed is ${MAX_FILE_SIZE_MB} MB. Please compress your file or contact support for larger file uploads.`;
       } else if (error.message?.includes('413')) {
         errorMessage = `File size limit exceeded. Please use a file smaller than ${MAX_FILE_SIZE_MB} MB.`;
+      } else if (error.message?.includes('Invalid JWT') || error.message?.includes('token')) {
+        errorMessage = "Session expired. Please refresh the page and try again.";
+      } else if (error.message?.includes('bucket') || error.message?.includes('storage')) {
+        errorMessage = "Storage configuration error. Please contact support if this persists.";
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = `Upload failed: ${error.message}`;
       }
       
       setUploadError(errorMessage);

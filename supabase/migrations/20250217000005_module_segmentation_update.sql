@@ -70,18 +70,5 @@ USING (
   )
 );
 
--- Create function to automatically update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_study_materials_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create trigger to call the function
-DROP TRIGGER IF EXISTS update_study_materials_updated_at_trigger ON study_materials;
-CREATE TRIGGER update_study_materials_updated_at_trigger
-    BEFORE UPDATE ON study_materials
-    FOR EACH ROW
-    EXECUTE FUNCTION update_study_materials_updated_at(); 
+-- Note: The update_study_materials_updated_at() function and trigger 
+-- are already created in the enhanced_study_materials migration 

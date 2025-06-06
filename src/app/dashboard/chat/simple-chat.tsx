@@ -6,8 +6,73 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Plus } from 'lucide-react'
+import { Send, Bot, User, Plus, Trash2 } from 'lucide-react'
 import type { ChatSession, Message } from '@/types/database'
+import { cn } from '@/lib/utils'
+import { formatForPreWrap } from '@/utils/text-formatting'
+
+// Helper function to group sessions by date periods like ChatGPT
+const groupSessionsByDate = (sessions: ChatSession[]) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const groups: { [key: string]: ChatSession[] } = {
+    Today: [],
+    Yesterday: [],
+    'Previous 7 days': [],
+    'Previous 30 days': []
+  };
+
+  const monthGroups: { [key: string]: ChatSession[] } = {};
+
+  sessions.forEach(session => {
+    const sessionDate = new Date(session.last_message_at);
+    const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+
+    if (sessionDay.getTime() === today.getTime()) {
+      groups.Today.push(session);
+    } else if (sessionDay.getTime() === yesterday.getTime()) {
+      groups.Yesterday.push(session);
+    } else if (sessionDate >= sevenDaysAgo) {
+      groups['Previous 7 days'].push(session);
+    } else if (sessionDate >= thirtyDaysAgo) {
+      groups['Previous 30 days'].push(session);
+    } else {
+      const monthKey = sessionDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      if (!monthGroups[monthKey]) {
+        monthGroups[monthKey] = [];
+      }
+      monthGroups[monthKey].push(session);
+    }
+  });
+
+  // Sort month groups by date (most recent first)
+  const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => {
+    const dateA = new Date(a + ' 1');
+    const dateB = new Date(b + ' 1');
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  // Combine all groups
+  const result: { [key: string]: ChatSession[] } = {};
+  
+  // Add main groups if they have sessions
+  Object.keys(groups).forEach(key => {
+    if (groups[key].length > 0) {
+      result[key] = groups[key];
+    }
+  });
+
+  // Add month groups
+  sortedMonthKeys.forEach(key => {
+    result[key] = monthGroups[key];
+  });
+
+  return result;
+};
 
 export default function SimpleChat() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -145,23 +210,35 @@ export default function SimpleChat() {
         </div>
         
         <ScrollArea className="flex-1">
-          <div className="p-2">
-            {sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => handleSessionSelect(session)}
-                className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
-                  selectedSession?.id === session.id
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                <div className="font-medium truncate">{session.title}</div>
-                <div className="text-sm text-gray-500">
-                  {new Date(session.last_message_at).toLocaleDateString()}
+          <div className="px-3 py-2">
+            {(() => {
+              const groupedSessions = groupSessionsByDate(sessions);
+              return Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
+                <div key={groupName} className="mb-6">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">
+                    {groupName}
+                  </h3>
+                  <div className="space-y-1">
+                    {groupSessions.map((session: ChatSession) => (
+                      <div
+                        key={session.id}
+                        className={cn(
+                          "flex items-center justify-between mx-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group",
+                          selectedSession?.id === session.id 
+                            ? "bg-gray-200 text-gray-900" 
+                            : "hover:bg-gray-100 text-gray-700"
+                        )}
+                        onClick={() => handleSessionSelect(session)}
+                      >
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-sm font-medium truncate overflow-hidden">{session.title}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </button>
-            ))}
+              ));
+            })()}
           </div>
         </ScrollArea>
       </div>
@@ -192,17 +269,17 @@ export default function SimpleChat() {
                       }`}
                     >
                       {message.role === 'assistant' && (
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center">
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
                       
                       <Card className={`max-w-[70%] p-3 ${
                         message.role === 'user' 
-                          ? 'bg-blue-500 text-white' 
+                          ? 'bg-black text-white' 
                           : 'bg-white'
                       }`}>
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        <p className="whitespace-pre-wrap">{formatForPreWrap(message.content)}</p>
                       </Card>
 
                       {message.role === 'user' && (

@@ -23,6 +23,7 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
 import { StandaloneFlashcardViewer } from "./standalone-flashcard-viewer";
 import { ContentGeneratorModal } from "./content-generator-modal";
+import { formatForPreWrap } from '@/utils/text-formatting';
 
 interface Document {
   id: string;
@@ -577,7 +578,7 @@ export default function FlashcardGenerator({
                 <CardContent>
                   <div className="prose prose-sm max-w-none">
                     <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                      {summary}
+                      {formatForPreWrap(summary)}
                     </p>
                   </div>
                 </CardContent>

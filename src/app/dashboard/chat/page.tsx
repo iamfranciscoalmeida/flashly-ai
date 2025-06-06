@@ -31,6 +31,7 @@ function ChatPageContent() {
       }
 
       setUserId(user.id);
+      console.log('User ID:', user.id);
 
       // Check URL params for existing sessionId
       const existingSessionId = searchParams.get('sessionId');

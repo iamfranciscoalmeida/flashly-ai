@@ -44,10 +44,13 @@ import {
   Menu,
   MessageSquare,
   Trash2,
-  ChevronRight
+  ChevronRight,
+  Edit,
+  FileDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { formatForPreWrap } from '@/utils/text-formatting';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -104,6 +107,69 @@ interface ModernChatInterfaceProps {
   onNewContent?: (content: string, type: 'upload' | 'paste' | 'record') => void;
 }
 
+// Helper function to group sessions by date periods like ChatGPT
+const groupSessionsByDate = (sessions: ChatSession[]) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const groups: { [key: string]: ChatSession[] } = {
+    Today: [],
+    Yesterday: [],
+    'Previous 7 days': [],
+    'Previous 30 days': []
+  };
+
+  const monthGroups: { [key: string]: ChatSession[] } = {};
+
+  sessions.forEach(session => {
+    const sessionDate = new Date(session.last_message_at);
+    const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+
+    if (sessionDay.getTime() === today.getTime()) {
+      groups.Today.push(session);
+    } else if (sessionDay.getTime() === yesterday.getTime()) {
+      groups.Yesterday.push(session);
+    } else if (sessionDate >= sevenDaysAgo) {
+      groups['Previous 7 days'].push(session);
+    } else if (sessionDate >= thirtyDaysAgo) {
+      groups['Previous 30 days'].push(session);
+    } else {
+      const monthKey = sessionDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      if (!monthGroups[monthKey]) {
+        monthGroups[monthKey] = [];
+      }
+      monthGroups[monthKey].push(session);
+    }
+  });
+
+  // Sort month groups by date (most recent first)
+  const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => {
+    const dateA = new Date(a + ' 1');
+    const dateB = new Date(b + ' 1');
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  // Combine all groups
+  const result: { [key: string]: ChatSession[] } = {};
+  
+  // Add main groups if they have sessions
+  Object.keys(groups).forEach(key => {
+    if (groups[key].length > 0) {
+      result[key] = groups[key];
+    }
+  });
+
+  // Add month groups
+  sortedMonthKeys.forEach(key => {
+    result[key] = monthGroups[key];
+  });
+
+  return result;
+};
+
 export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernChatInterfaceProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -130,6 +196,8 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [showSidebar, setShowSidebar] = useState(true); // Show sidebar by default
+  const [editingSession, setEditingSession] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -288,6 +356,124 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
     } catch (error) {
       console.error('Error:', error);
     }
+  };
+
+  const renameSession = async (sessionId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    
+    try {
+      const supabase = (await import('@/supabase/client')).createClient();
+      
+      const { error } = await supabase
+        .from('chat_sessions')
+        .update({ title: newTitle.trim() })
+        .eq('id', sessionId);
+
+      if (error) {
+        console.error('Error renaming session:', error);
+        toast({
+          title: "Error",
+          description: "Failed to rename session. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSessions(sessions.map(s => 
+        s.id === sessionId ? { ...s, title: newTitle.trim() } : s
+      ));
+      
+      if (currentSession?.id === sessionId) {
+        setCurrentSession({ ...currentSession, title: newTitle.trim() });
+      }
+      
+      setEditingSession(null);
+      setEditingTitle('');
+      
+      toast({
+        title: "Success",
+        description: "Session renamed successfully.",
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const exportSessionToPDF = async (sessionId: string) => {
+    try {
+      const supabase = (await import('@/supabase/client')).createClient();
+      
+      // Get session details
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return;
+      
+      // Get all messages for this session
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch chat messages.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create PDF content
+      let pdfContent = `# ${session.title}\n\n`;
+      pdfContent += `**Date:** ${new Date(session.created_at).toLocaleDateString()}\n\n`;
+      pdfContent += `---\n\n`;
+      
+      messages?.forEach((message, index) => {
+        const role = message.role === 'user' ? 'You' : 'AI Assistant';
+        const timestamp = new Date(message.created_at).toLocaleTimeString();
+        pdfContent += `**${role}** *(${timestamp})*\n\n`;
+        pdfContent += `${message.content}\n\n`;
+        if (index < messages.length - 1) {
+          pdfContent += `---\n\n`;
+        }
+      });
+
+      // Create a blob with the content
+      const blob = new Blob([pdfContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${session.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Chat exported successfully as text file.",
+      });
+    } catch (error) {
+      console.error('Error exporting session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export session. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const startRename = (sessionId: string, currentTitle: string) => {
+    setEditingSession(sessionId);
+    setEditingTitle(currentTitle);
+  };
+
+  const cancelRename = () => {
+    setEditingSession(null);
+    setEditingTitle('');
   };
 
   // Load message history when session changes
@@ -675,7 +861,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
   };
 
   // Message handlers - now saves to database
-  const addMessage = async (role: Message['role'], content: string, type?: string, specialContent?: any, attachments?: FileAttachment[]) => {
+  const addMessage = async (role: Message['role'], content: string, type?: string, specialContent?: any, attachments?: FileAttachment[], overrideSessionId?: string) => {
     const newMessage: Message = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       role,
@@ -689,8 +875,11 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
     
     setMessages((prev: Message[]) => [...prev, newMessage]);
     
+    // Use override session ID if provided, otherwise use the prop sessionId
+    const sessionIdToUse = overrideSessionId || sessionId;
+    
     // Save to database (only for real messages, not typing indicators)
-    if (role !== 'system' && !newMessage.isTyping && sessionId) {
+    if (role !== 'system' && !newMessage.isTyping && sessionIdToUse) {
       try {
         const supabase = (await import('@/supabase/client')).createClient();
         
@@ -704,7 +893,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
         const { error: insertError } = await supabase
           .from('chat_messages')
           .insert({
-            session_id: sessionId,
+            session_id: sessionIdToUse,
             user_id: user.id,
             role: role,
             content: content,
@@ -740,7 +929,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
-                sessionId,
+                sessionId: sessionIdToUse,
                 titleSource: 'chat'
               })
             });
@@ -777,27 +966,72 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
   const sendMessage = async () => {
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
 
-    // Validate required fields
-    if (!sessionId) {
-      console.error('No sessionId available');
-      toast({
-        title: "Error",
-        description: "No session available. Please refresh the page.",
-        variant: "destructive",
-      });
-      return;
+    // Auto-create a session if none exists
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      console.log('No session available, creating new session...');
+      try {
+        const supabase = (await import('@/supabase/client')).createClient();
+        
+        // Check if user is authenticated
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          console.error('User not authenticated:', authError);
+          toast({
+            title: "Error",
+            description: "User not authenticated. Please refresh the page.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('chat_sessions')
+          .insert({
+            user_id: user.id,
+            title: 'New Chat',
+            last_message_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating session:', error);
+          toast({
+            title: "Error",
+            description: "Failed to create new session. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        currentSessionId = data.id;
+        setSessions(prev => [data, ...prev]);
+        setCurrentSession(data);
+        
+        // Update URL to include the new session ID
+        window.history.pushState({}, '', `/dashboard/chat?sessionId=${data.id}`);
+        
+        console.log('Created new session:', data.id);
+      } catch (error) {
+        console.error('Failed to create session:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create session. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
-
-
 
     setShowLandingPage(false);
     const userMessage = input.trim();
     const readyAttachments = attachments.filter((att: FileAttachment) => att.status === 'ready');
     
-    console.log('Sending message with:', { sessionId, userMessage, attachments: readyAttachments.length });
+    console.log('Sending message with:', { sessionId: currentSessionId, userMessage, attachments: readyAttachments.length });
     
     // Add user message immediately for better UX
-    addMessage('user', userMessage, undefined, undefined, readyAttachments);
+    addMessage('user', userMessage, undefined, undefined, readyAttachments, currentSessionId);
     setInput('');
     setAttachments([]);
     setIsLoading(true);
@@ -815,7 +1049,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
     try {
       // Validate and prepare the request body
       const requestBody = {
-        sessionId: sessionId,
+        sessionId: currentSessionId,
         message: userMessage,
         attachments: readyAttachments,
         context: sessionContent || ''
@@ -845,7 +1079,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
       
       // Add AI response
       if (data.aiMessage) {
-        addMessage('assistant', data.aiMessage.content);
+        addMessage('assistant', data.aiMessage.content, undefined, undefined, undefined, currentSessionId);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -853,7 +1087,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
       setMessages((prev: Message[]) => prev.filter((msg: Message) => msg.id !== 'typing'));
       
       // Show error message
-      addMessage('assistant', 'I apologize, but I encountered an error. Please try again or refresh the page if the issue persists.');
+      addMessage('assistant', 'I apologize, but I encountered an error. Please try again or refresh the page if the issue persists.', undefined, undefined, undefined, currentSessionId);
       
       toast({
         title: "Error",
@@ -992,7 +1226,8 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
             setShowFlashcards(true);
             await addMessage('assistant', `I've generated ${flashcards.length} flashcards for you! Click "View Flashcards" to start studying.`);
           } else {
-            await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+            const formattedContent = typeof data.content === 'string' ? formatForPreWrap(data.content) : JSON.stringify(data.content, null, 2);
+            await addMessage('assistant', `Here are your generated ${type}:\n\n${formattedContent}`);
           }
         } else if (type === 'quiz') {
           // Handle quiz content
@@ -1014,10 +1249,12 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
             setShowQuiz(true);
             await addMessage('assistant', `I've generated ${quiz.length} quiz questions for you! Choose your preferred mode and click "Take Quiz" to test your knowledge.`);
           } else {
-            await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+            const formattedContent = typeof data.content === 'string' ? formatForPreWrap(data.content) : JSON.stringify(data.content, null, 2);
+            await addMessage('assistant', `Here are your generated ${type}:\n\n${formattedContent}`);
           }
         } else {
-          await addMessage('assistant', `Here are your generated ${type}:\n\n${JSON.stringify(data.content, null, 2)}`);
+          const formattedContent = typeof data.content === 'string' ? formatForPreWrap(data.content) : JSON.stringify(data.content, null, 2);
+          await addMessage('assistant', `Here are your generated ${type}:\n\n${formattedContent}`);
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -1107,51 +1344,101 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                   </div>
                 </div>
                 <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-2">
-                    {sessions.map((session: ChatSession) => (
-                      <motion.div
-                        key={session.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Card
-                          className={cn(
-                            "p-4 cursor-pointer hover:shadow-md transition-all group",
-                            currentSession?.id === session.id && "bg-primary/10 border-primary shadow-md"
-                          )}
-                          onClick={() => selectSession(session)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MessageSquare className={cn(
-                                  "h-4 w-4",
-                                  currentSession?.id === session.id ? "text-primary" : "text-gray-500"
-                                )} />
-                                <p className="text-sm font-medium truncate">{session.title}</p>
-                              </div>
-                              <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(session.last_message_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {currentSession?.id === session.id && (
-                                <ChevronRight className="h-4 w-4 text-black" />
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-                                onClick={(e: React.MouseEvent) => deleteSession(session.id, e)}
+                  <div className="py-2">
+                    {(() => {
+                      const groupedSessions = groupSessionsByDate(sessions);
+                      return Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
+                        <div key={groupName} className="mb-6">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-4">
+                            {groupName}
+                          </h3>
+                          <div className="space-y-1">
+                            {groupSessions.map((session: ChatSession) => (
+                              <motion.div
+                                key={session.id}
+                                whileHover={{ x: 4 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="px-3"
                               >
-                                <Trash2 className="h-3 w-3 text-red-500" />
-                              </Button>
-                            </div>
+                                <div
+                                  className={cn(
+                                    "flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors group relative max-w-full",
+                                    currentSession?.id === session.id 
+                                      ? "bg-gray-200 text-gray-900" 
+                                      : "hover:bg-gray-100 text-gray-700"
+                                  )}
+                                  onClick={() => selectSession(session)}
+                                >
+                                  <div className="flex-1 min-w-0 pr-2">
+                                    {editingSession === session.id ? (
+                                      <input
+                                        type="text"
+                                        value={editingTitle}
+                                        onChange={(e) => setEditingTitle(e.target.value)}
+                                        onBlur={() => renameSession(session.id, editingTitle)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            renameSession(session.id, editingTitle);
+                                          } else if (e.key === 'Escape') {
+                                            cancelRename();
+                                          }
+                                        }}
+                                        className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-white focus:border focus:border-blue-500 rounded px-1"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <p className="text-sm font-medium truncate max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">{session.title}</p>
+                                    )}
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-gray-200 flex-shrink-0"
+                                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="h-3 w-3 text-gray-500" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startRename(session.id, session.title);
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Rename
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          exportSessionToPDF(session.id);
+                                        }}
+                                      >
+                                        <FileDown className="h-4 w-4 mr-2" />
+                                        Export to Text
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteSession(session.id, e);
+                                        }}
+                                        className="text-red-600 focus:text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </motion.div>
+                            ))}
                           </div>
-                        </Card>
-                      </motion.div>
-                    ))}
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </ScrollArea>
               </motion.div>
@@ -1216,51 +1503,101 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                 </div>
               </div>
               <ScrollArea className="flex-1">
-                <div className="p-4 space-y-2">
-                  {sessions.map((session: ChatSession) => (
-                    <motion.div
-                      key={session.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Card
-                        className={cn(
-                          "p-4 cursor-pointer hover:shadow-md transition-all group",
-                          currentSession?.id === session.id && "bg-gray-100 border-black shadow-md"
-                        )}
-                        onClick={() => selectSession(session)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <MessageSquare className={cn(
-                                "h-4 w-4",
-                                currentSession?.id === session.id ? "text-black" : "text-gray-500"
-                              )} />
-                              <p className="text-sm font-medium truncate">{session.title}</p>
-                            </div>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(session.last_message_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {currentSession?.id === session.id && (
-                              <ChevronRight className="h-4 w-4 text-primary" />
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-                              onClick={(e: React.MouseEvent) => deleteSession(session.id, e)}
+                <div className="py-2">
+                  {(() => {
+                    const groupedSessions = groupSessionsByDate(sessions);
+                    return Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
+                      <div key={groupName} className="mb-6">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-4">
+                          {groupName}
+                        </h3>
+                        <div className="space-y-1">
+                          {groupSessions.map((session: ChatSession) => (
+                            <motion.div
+                              key={session.id}
+                              whileHover={{ x: 4 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="px-3"
                             >
-                              <Trash2 className="h-3 w-3 text-red-500" />
-                            </Button>
-                          </div>
+                              <div
+                                className={cn(
+                                  "flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors group relative max-w-full",
+                                  currentSession?.id === session.id 
+                                    ? "bg-gray-200 text-gray-900" 
+                                    : "hover:bg-gray-100 text-gray-700"
+                                )}
+                                onClick={() => selectSession(session)}
+                              >
+                                <div className="flex-1 min-w-0 pr-2">
+                                  {editingSession === session.id ? (
+                                    <input
+                                      type="text"
+                                      value={editingTitle}
+                                      onChange={(e) => setEditingTitle(e.target.value)}
+                                      onBlur={() => renameSession(session.id, editingTitle)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          renameSession(session.id, editingTitle);
+                                        } else if (e.key === 'Escape') {
+                                          cancelRename();
+                                        }
+                                      }}
+                                      className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-white focus:border focus:border-blue-500 rounded px-1"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <p className="text-sm font-medium truncate max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">{session.title}</p>
+                                  )}
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-gray-200 flex-shrink-0"
+                                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-3 w-3 text-gray-500" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startRename(session.id, session.title);
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Rename
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        exportSessionToPDF(session.id);
+                                      }}
+                                    >
+                                      <FileDown className="h-4 w-4 mr-2" />
+                                      Export to Text
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteSession(session.id, e);
+                                      }}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </motion.div>
+                          ))}
                         </div>
-                      </Card>
-                    </motion.div>
-                  ))}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </ScrollArea>
             </motion.div>
@@ -1296,7 +1633,12 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
         {uploadedDocument && (
           <div className="w-1/2 border-r flex flex-col">
             <div className="border-b px-4 py-3 bg-gray-50">
-              <h3 className="font-medium text-sm text-gray-700">{uploadedDocument.name}</h3>
+              <h3 className={cn(
+                "font-medium text-sm text-gray-700",
+                showSidebar ? "ml-12" : "ml-12"
+              )}>
+                {uploadedDocument.name}
+              </h3>
             </div>
             <div className="flex-1">
               <DocumentViewer
@@ -1309,25 +1651,44 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           </div>
         )}
 
+        {/* Sessions button positioned on left when in PDF mode */}
+        {uploadedDocument && (
+          <Button
+            variant="default"
+            size="sm"
+            className={cn(
+              "fixed top-4 z-30 w-10 h-10 p-0 transition-all duration-300 shadow-lg",
+              "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 hover:text-gray-900",
+              showSidebar ? "left-[336px]" : "left-4"
+            )}
+            onClick={() => setShowSidebar(!showSidebar)}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
+
         {/* Chat Panel */}
         <div className={cn("flex flex-col", uploadedDocument ? "w-1/2" : "w-full")}>
           {/* Header */}
           <div className="border-b px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-sm">
             <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => setShowSidebar(!showSidebar)}
-              >
-                <Menu className="h-4 w-4" />
-                Sessions ({sessions.length})
-              </Button>
+              {/* Only show Sessions button in header when NOT in PDF mode */}
+              {!uploadedDocument && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => setShowSidebar(!showSidebar)}
+                >
+                  <Menu className="h-4 w-4" />
+                  Sessions ({sessions.length})
+                </Button>
+              )}
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-black" />
                 AI Study Assistant
               </h2>
-              <Badge variant="secondary">GPT-4 Powered</Badge>
+              {/* <Badge variant="secondary">GPT-4 Powered</Badge> */}
             </div>
           </div>
 
@@ -1505,7 +1866,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                     </Avatar>
                   )}
                   
-                  <div                     className={cn(
+                  <div className={cn(
                       "group relative max-w-[80%] rounded-2xl px-4 py-3",
                       message.role === 'user' 
                         ? 'bg-black text-white ml-12' 
@@ -1531,7 +1892,10 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                       </div>
                     ) : (
                       <>
-                        <div className="prose prose-sm max-w-none">
+                        <div className={cn(
+                          "prose prose-sm max-w-none",
+                          message.role === 'user' && "prose-invert"
+                        )}>
                           <ReactMarkdown>{message.content}</ReactMarkdown>
                         </div>
                         
@@ -1605,7 +1969,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                         {/* Message metadata */}
                         <div className={cn(
                           "flex items-center gap-2 mt-2 text-xs",
-                          message.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                          message.role === 'user' ? 'text-white/80' : 'text-gray-500'
                         )}>
                           <Clock className="h-3 w-3" />
                           {new Date(message.timestamp).toLocaleTimeString([], { 

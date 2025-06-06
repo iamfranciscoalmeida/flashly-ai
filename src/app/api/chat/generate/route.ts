@@ -408,14 +408,47 @@ export async function POST(request: Request) {
       }
     }
 
-    // PRIORITY 2: PROVIDED CONTENT (only if substantial and no document content)
+    // PRIORITY 2: YOUTUBE VIDEO CONTENT (check session for linked video)
+    if (!content) {
+      console.log("🎥 Checking for YouTube video content...");
+      const { data: sessionData } = await supabase
+        .from("chat_sessions")
+        .select("youtube_video_id")
+        .eq("id", sessionId)
+        .single();
+
+      if (sessionData?.youtube_video_id) {
+        const { data: video } = await supabase
+          .from("youtube_videos")
+          .select("title, transcript, description, channel_title")
+          .eq("id", sessionData.youtube_video_id)
+          .single();
+
+        if (video) {
+        content = `YouTube Video: ${video.title}\n`;
+        if (video.channel_title) {
+          content += `Channel: ${video.channel_title}\n`;
+        }
+        if (video.description) {
+          content += `\nDescription:\n${video.description}\n`;
+        }
+        if (video.transcript) {
+          content += `\nTranscript:\n${video.transcript}`;
+        }
+        contentSource = "youtube_video";
+        console.log("✅ SUCCESS: Using YouTube video content, length:", content.length);
+        }
+      }
+    }
+
+    // PRIORITY 3: PROVIDED CONTENT (only if substantial and no document/video content)
     if (!content && providedContent && providedContent.length > 100) {
       content = providedContent;
       contentSource = "provided_content";
       console.log("✅ Using provided content, length:", content.length);
     }
 
-    // PRIORITY 3: CHAT MESSAGES
+    // PRIORITY 4: CHAT MESSAGES
     if (!content) {
       console.log("🔍 Checking chat messages...");
       const { data: messages } = await supabase
@@ -516,21 +549,113 @@ export async function POST(request: Request) {
 
     console.log("✅ CONTENT GENERATED SUCCESSFULLY");
 
-    // TODO: Save generated content to database (currently disabled due to RLS policy)
-    // We need to create a proper chat session and message first
-    // const { data: savedContent, error: saveError } = await supabase
-    //   .from("generated_content")
-    //   .insert({
-    //     message_id: null,
-    //     type,
-    //     content: generatedContent
-    //   })
-    //   .select()
-    //   .single();
+    // Save generated content to database
+    try {
+      console.log("💾 Saving generated content to database...");
+      
+      // First, create a message record for this generation
+      const { data: messageData, error: messageError } = await supabase
+        .from("messages")
+        .insert({
+          session_id: sessionId,
+          role: 'assistant',
+          content: `Generated ${type} from ${contentSource}`,
+          metadata: {
+            type: 'generated_content',
+            contentType: type,
+            generationSettings: options
+          }
+        })
+        .select()
+        .single();
 
-    // if (saveError) {
-    //   console.error("Error saving generated content:", saveError);
-    // }
+      if (messageError) {
+        console.error("Error creating message record:", messageError);
+        throw messageError;
+      }
+
+      // Save to generated_content table
+      const { data: savedContent, error: saveError } = await supabase
+        .from("generated_content")
+        .insert({
+          message_id: messageData.id,
+          type,
+          content: generatedContent
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error("Error saving generated content:", saveError);
+        throw saveError;
+      }
+
+      // Also save individual items to their respective tables for dashboard stats
+      if (type === 'flashcards' && Array.isArray(generatedContent)) {
+        console.log("💾 Saving flashcards to flashcards table...");
+        const flashcardsToSave = generatedContent.map((card: any) => ({
+          user_id: user.id,
+          document_id: documentId || null,
+          module_id: moduleId || null,
+          question: card.question || card.front || card.term,
+          answer: card.answer || card.back || card.definition,
+          source_reference: {
+            generated_from: 'chat',
+            session_id: sessionId,
+            message_id: messageData.id,
+            content_source: contentSource
+          },
+          difficulty_level: card.difficulty_level || 'medium',
+          tags: card.tags || []
+        }));
+
+        const { error: flashcardsError } = await supabase
+          .from("flashcards")
+          .insert(flashcardsToSave);
+
+        if (flashcardsError) {
+          console.error("Error saving flashcards:", flashcardsError);
+        } else {
+          console.log(`✅ Saved ${flashcardsToSave.length} flashcards to database`);
+        }
+      }
+
+      if (type === 'quiz' && Array.isArray(generatedContent)) {
+        console.log("💾 Saving quiz questions to quizzes table...");
+        const quizzesToSave = generatedContent.map((quiz: any) => ({
+          user_id: user.id,
+          document_id: documentId || null,
+          module_id: moduleId || null,
+          question: quiz.question,
+          options: quiz.options || quiz.choices || [],
+          correct: quiz.correct || quiz.correct_answer || quiz.answer,
+          explanation: quiz.explanation || '',
+          source_reference: {
+            generated_from: 'chat',
+            session_id: sessionId,
+            message_id: messageData.id,
+            content_source: contentSource
+          },
+          difficulty_level: quiz.difficulty_level || 'medium',
+          tags: quiz.tags || []
+        }));
+
+        const { error: quizzesError } = await supabase
+          .from("quizzes")
+          .insert(quizzesToSave);
+
+        if (quizzesError) {
+          console.error("Error saving quizzes:", quizzesError);
+        } else {
+          console.log(`✅ Saved ${quizzesToSave.length} quiz questions to database`);
+        }
+      }
+
+      console.log("✅ All content saved successfully to database");
+    } catch (saveError) {
+      console.error("❌ Error saving content to database:", saveError);
+      // Don't fail the entire request if saving fails, just log the error
+    }
 
     return NextResponse.json({
       success: true,

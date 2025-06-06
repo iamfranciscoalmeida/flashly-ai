@@ -139,26 +139,22 @@ export function ChatPageClient({
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {sessions.map((session) => (
-                <Card
+                <div
                   key={session.id}
                   className={cn(
-                    "p-3 cursor-pointer hover:bg-gray-50 transition-colors",
-                    selectedSession?.id === session.id && "bg-primary/5 border-primary"
+                    "flex items-center justify-between mx-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group",
+                    selectedSession?.id === session.id 
+                      ? "bg-gray-200 text-gray-900" 
+                      : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => handleSessionSelect(session)}
                 >
-                  <div className="flex items-start gap-3">
-                    <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{session.title}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(session.last_message_at).toLocaleDateString()}
-                      </p>
-                    </div>
+                  <div className="flex-1 min-w-0 pr-2">
+                    <p className="text-sm font-medium truncate overflow-hidden">{session.title}</p>
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           </div>
