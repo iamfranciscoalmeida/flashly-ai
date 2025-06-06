@@ -10,6 +10,9 @@ import { Send, Bot, User, Plus, Trash2 } from 'lucide-react'
 import type { ChatSession, Message } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { formatForPreWrap } from '@/utils/text-formatting'
+import MicToggle from '@/components/voice/MicToggle'
+import VoiceRecorder from '@/components/voice/VoiceRecorder'
+import VoiceMessage from '@/components/voice/VoiceMessage'
 
 // Helper function to group sessions by date periods like ChatGPT
 const groupSessionsByDate = (sessions: ChatSession[]) => {
@@ -81,6 +84,9 @@ export default function SimpleChat() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isVoiceMode, setIsVoiceMode] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
   
   const supabase = createClient()
 
@@ -135,7 +141,8 @@ export default function SimpleChat() {
         .from('chat_sessions')
         .insert({
           user_id: userId,
-          title: 'New Chat',
+          title: isVoiceMode ? 'New Voice Chat' : 'New Chat',
+          mode: isVoiceMode ? 'voice' : 'text',
           last_message_at: new Date().toISOString()
         })
         .select()
@@ -151,15 +158,16 @@ export default function SimpleChat() {
     }
   }
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading || !selectedSession) return
+  const sendMessage = async (audioUrl?: string) => {
+    if ((!input.trim() && !audioUrl) || isLoading || !selectedSession) return
 
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       session_id: selectedSession.id,
       role: 'user',
       content: input,
-      metadata: {},
+      audio_url: audioUrl,
+      metadata: audioUrl ? { isVoice: true } : {},
       created_at: new Date().toISOString()
     }
 
@@ -173,7 +181,9 @@ export default function SimpleChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: selectedSession.id,
-          content: input
+          message: input,
+          audioUrl,
+          isVoice: !!audioUrl
         })
       })
 
@@ -181,8 +191,36 @@ export default function SimpleChat() {
         const data = await response.json()
         setMessages(prev => {
           const filtered = prev.filter(m => !m.id.startsWith('temp-'))
-          return [...filtered, data.userMessage, data.assistantMessage]
+          return [...filtered, data.userMessage, data.aiMessage]
         })
+
+        // Generate TTS for assistant response if in voice mode
+        if (isVoiceMode && data.aiMessage?.content) {
+          try {
+            const ttsResponse = await fetch('/api/voice/speak', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: data.aiMessage.content,
+                voice: 'alloy'
+              })
+            })
+
+            if (ttsResponse.ok) {
+              const audioBlob = await ttsResponse.blob()
+              const audioUrl = URL.createObjectURL(audioBlob)
+              
+              // Update the assistant message with audio URL
+              setMessages(prev => prev.map(msg => 
+                msg.id === data.aiMessage.id 
+                  ? { ...msg, audio_url: audioUrl }
+                  : msg
+              ))
+            }
+          } catch (ttsError) {
+            console.error('TTS error:', ttsError)
+          }
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -195,6 +233,49 @@ export default function SimpleChat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
+    }
+  }
+
+  const handleVoiceRecording = async (audioBlob: Blob, duration: number) => {
+    if (!selectedSession) return
+
+    setIsProcessingVoice(true)
+    try {
+      // First transcribe the audio
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'recording.webm')
+      
+      const transcribeResponse = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (transcribeResponse.ok) {
+        const { text } = await transcribeResponse.json()
+        setInput(text)
+        
+        // Upload audio file
+        const uploadFormData = new FormData()
+        uploadFormData.append('audio', audioBlob, 'recording.webm')
+        uploadFormData.append('sessionId', selectedSession.id)
+        
+        const uploadResponse = await fetch('/api/voice/upload', {
+          method: 'POST',
+          body: uploadFormData
+        })
+
+        if (uploadResponse.ok) {
+          const { audioUrl } = await uploadResponse.json()
+          await sendMessage(audioUrl)
+        } else {
+          // Send without audio URL if upload fails
+          await sendMessage()
+        }
+      }
+    } catch (error) {
+      console.error('Voice processing error:', error)
+    } finally {
+      setIsProcessingVoice(false)
     }
   }
 
@@ -274,13 +355,22 @@ export default function SimpleChat() {
                         </div>
                       )}
                       
-                      <Card className={`max-w-[70%] p-3 ${
-                        message.role === 'user' 
-                          ? 'bg-black text-white' 
-                          : 'bg-white'
-                      }`}>
-                        <p className="whitespace-pre-wrap">{formatForPreWrap(message.content)}</p>
-                      </Card>
+                      {message.audio_url ? (
+                        <VoiceMessage
+                          audioUrl={message.audio_url}
+                          transcript={message.content}
+                          isAssistant={message.role === 'assistant'}
+                          className="max-w-[70%]"
+                        />
+                      ) : (
+                        <Card className={`max-w-[70%] p-3 ${
+                          message.role === 'user' 
+                            ? 'bg-black text-white' 
+                            : 'bg-white'
+                        }`}>
+                          <p className="whitespace-pre-wrap">{formatForPreWrap(message.content)}</p>
+                        </Card>
+                      )}
 
                       {message.role === 'user' && (
                         <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center">
@@ -295,22 +385,46 @@ export default function SimpleChat() {
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex gap-2">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message..."
-                  className="flex-1 min-h-[44px] max-h-32"
-                  disabled={isLoading}
-                />
-                <Button 
-                  onClick={sendMessage} 
-                  disabled={!input.trim() || isLoading}
-                  size="icon"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  {isVoiceMode ? (
+                    <VoiceRecorder
+                      onRecordingComplete={handleVoiceRecording}
+                      isRecording={isRecording}
+                      onRecordingStart={() => setIsRecording(true)}
+                      onRecordingStop={() => setIsRecording(false)}
+                      disabled={isLoading || isProcessingVoice}
+                    />
+                  ) : (
+                    <Textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message..."
+                      className="min-h-[44px] max-h-32"
+                      disabled={isLoading}
+                    />
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <MicToggle
+                    isVoiceMode={isVoiceMode}
+                    onToggle={() => setIsVoiceMode(!isVoiceMode)}
+                    isRecording={isRecording}
+                    isProcessing={isProcessingVoice}
+                  />
+                  
+                  {!isVoiceMode && (
+                    <Button 
+                      onClick={() => sendMessage()} 
+                      disabled={!input.trim() || isLoading}
+                      size="icon"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </>

@@ -5,6 +5,7 @@ export type ChatSession = {
   module_id: string | null;
   folder_id: string | null;
   title: string;
+  mode?: 'text' | 'voice';
   last_message_at: string;
   created_at: string;
   updated_at: string;
@@ -24,6 +25,7 @@ export type Message = {
   session_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  audio_url?: string | null;
   metadata: Record<string, any>;
   created_at: string;
 };

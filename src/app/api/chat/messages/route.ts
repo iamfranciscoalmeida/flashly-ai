@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { sessionId, message, attachments, context } = await request.json();
+    const { sessionId, message, attachments, context, audioUrl, isVoice } = await request.json();
 
     if (!sessionId || !message) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
 
     // Save user message
     let userMessage = null;
+    const messageMetadata = {
+      ...(attachments && { attachments }),
+      ...(isVoice && { isVoice: true })
+    };
+    
     const { data: userMsgData, error: userMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -41,7 +46,8 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         role: 'user',
         content: message,
-        metadata: attachments ? { attachments } : null
+        audio_url: audioUrl || null,
+        metadata: Object.keys(messageMetadata).length > 0 ? messageMetadata : null
       })
       .select()
       .single();
@@ -85,7 +91,7 @@ export async function POST(request: NextRequest) {
       content: msg.content
     })) || [];
 
-    // Add system prompt
+    // Add system prompt with voice-specific instructions if this is a voice session
     const systemPrompt = {
       role: 'system' as const,
       content: `You are an AI tutor designed to help students learn effectively. 
@@ -95,6 +101,10 @@ export async function POST(request: NextRequest) {
       - Encouraging and supportive
       - Structured with proper formatting when appropriate
       - Focused on helping the student understand concepts deeply
+      ${isVoice ? `
+      - Since this is a voice conversation, keep responses conversational and natural for speech
+      - Avoid excessive formatting or symbols that don't translate well to speech
+      - Use clear, spoken language patterns and transitions` : ''}
       
       When appropriate, use examples, analogies, and break down complex topics into simpler parts.
       If asked to generate study materials, format them properly for easy consumption.`

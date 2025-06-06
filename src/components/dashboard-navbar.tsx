@@ -13,6 +13,7 @@ import {
   Home,
   LayoutDashboard,
   MessageSquare,
+  Mic,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import UserProfile from "./user-profile";
@@ -56,12 +57,22 @@ export default function DashboardNavbar() {
             </Link>
             <Link href="/dashboard/chat">
               <Button
-                variant={isActive("/dashboard/chat") ? "default" : "ghost"}
+                variant={isActive("/dashboard/chat") && !isActive("/dashboard/voice-tutor") ? "default" : "ghost"}
                 size="sm"
                 className="flex items-center gap-1"
               >
                 <MessageSquare className="h-4 w-4" />
                 <span>AI Chat</span>
+              </Button>
+            </Link>
+            <Link href="/dashboard/voice-tutor">
+              <Button
+                variant={isActive("/dashboard/voice-tutor") ? "default" : "ghost"}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Mic className="h-4 w-4" />
+                <span>Voice Tutor</span>
               </Button>
             </Link>
 
