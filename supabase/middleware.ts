@@ -2,6 +2,18 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 export const updateSession = async (request: NextRequest) => {
+  // Check if we're in waitlist mode
+  const isWaitlistMode = process.env.NEXT_PUBLIC_WAITLIST_MODE === 'true';
+  
+  // If in waitlist mode, let the main middleware handle routing
+  if (isWaitlistMode) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+  }
+
   // This `try/catch` block is only here for the interactive tutorial.
   // Feel free to remove once you have Supabase connected.
   try {
@@ -42,15 +54,9 @@ export const updateSession = async (request: NextRequest) => {
     // https://supabase.com/docs/guides/auth/server-side/nextjs
     const { data: { user }, error } = await supabase.auth.getUser();
 
-    // protected routes
-    if (request.nextUrl.pathname.startsWith("/dashboard") && error) {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
-    }
-
-    if (request.nextUrl.pathname === "/" && !error) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-
+    // Only apply session management logic if not in waitlist mode
+    // The main middleware will handle route protection
+    
     return response;
   } catch (e) {
     // If you are here, a Supabase client could not be created!

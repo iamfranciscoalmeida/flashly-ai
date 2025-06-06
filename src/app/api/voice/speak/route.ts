@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/supabase/server';
 import OpenAI from 'openai';
+import { checkWaitlistMode } from '@/lib/config';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -8,6 +9,12 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if we're in waitlist mode
+    const waitlistCheck = checkWaitlistMode();
+    if (waitlistCheck.isWaitlistMode) {
+      return waitlistCheck.response;
+    }
+
     const supabase = await createClient();
     
     // Check authentication

@@ -3,6 +3,7 @@ import { createClient } from '../../../../supabase/server';
 import { IntelligentChunkingService } from '@/lib/intelligent-chunking-service';
 import { EnhancedAIService, type SummaryTier, type NotesFormat } from '@/lib/enhanced-ai-service';
 import { CachingService } from '@/lib/caching-service';
+import { checkWaitlistMode } from '@/lib/config';
 
 export interface GenerateRequest {
   content: string;
@@ -51,6 +52,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<GenerateR
   const startTime = Date.now();
   
   try {
+    // Check if we're in waitlist mode
+    const waitlistCheck = checkWaitlistMode();
+    if (waitlistCheck.isWaitlistMode) {
+      return waitlistCheck.response as NextResponse<GenerateResponse>;
+    }
+
     const supabase = await createClient();
     
     // Get the current user

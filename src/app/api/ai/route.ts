@@ -1,5 +1,6 @@
 import { createClient } from "../../../../supabase/server";
 import { NextResponse } from "next/server";
+import { checkWaitlistMode } from "@/lib/config";
 
 // Function to extract text from PDF (simplified for now)
 async function extractTextFromPDF(fileUrl: string): Promise<string> {
@@ -226,6 +227,12 @@ async function generateStudyContent(
 
 export async function POST(request: Request) {
   try {
+    // Check if we're in waitlist mode
+    const waitlistCheck = checkWaitlistMode();
+    if (waitlistCheck.isWaitlistMode) {
+      return waitlistCheck.response;
+    }
+
     const supabase = await createClient();
 
     // Get the current user

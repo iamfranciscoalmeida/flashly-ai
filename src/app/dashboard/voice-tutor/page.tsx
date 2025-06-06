@@ -1,390 +1,403 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { createClient } from '../../../../supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Bot, User, Plus, ArrowLeft, Mic, Volume2 } from 'lucide-react'
-import type { ChatSession, Message } from '@/types/database'
-import { cn } from '@/lib/utils'
-import { formatForPreWrap } from '@/utils/text-formatting'
-import VoiceRecorder from '@/components/voice/VoiceRecorder'
-import VoiceMessage from '@/components/voice/VoiceMessage'
-import Link from 'next/link'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import VoiceChatLoop from '@/components/voice/continuous/VoiceChatLoop';
+import { ConversationStatus } from '@/components/voice/continuous/ConversationStatus';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { createClient } from '@/supabase/client';
+import { Mic, MicOff, Info, Settings2, MessageSquare } from 'lucide-react';
+import { ConversationState } from '@/components/voice/continuous/ConversationStateMachine';
 
 export default function VoiceTutorPage() {
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(true)
+  const router = useRouter();
+  const [sessionId, setSessionId] = useState<string>('');
+  const [transcripts, setTranscripts] = useState<string[]>([]);
+  const [aiResponses, setAiResponses] = useState<string[]>([]);
+  const [currentState, setCurrentState] = useState<ConversationState>(ConversationState.IDLE);
+  const [confidence, setConfidence] = useState(0);
+  const [mode, setMode] = useState<'continuous' | 'push-to-talk'>('continuous');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const supabase = createClient()
+  // Enhanced debugging state
+  const [debugLogs, setDebugLogs] = useState<Array<{timestamp: string, type: string, message: string}>>([]);
+  const [showDebug, setShowDebug] = useState(true);
+  const [vadStatus, setVadStatus] = useState<string>('Initializing');
+  const [microphonePermission, setMicrophonePermission] = useState<string>('Unknown');
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [apiStatus, setApiStatus] = useState<{transcription: string, chat: string, tts: string}>({
+    transcription: 'Not tested',
+    chat: 'Not tested', 
+    tts: 'Not tested'
+  });
 
+  // Debug logging function
+  const addDebugLog = (type: string, message: string) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    setDebugLogs(prev => [...prev.slice(-19), {timestamp, type, message}]); // Keep last 20 logs
+    console.log(`[${type}] ${message}`);
+  };
+
+  // Initialize session and debugging
   useEffect(() => {
-    loadUserData()
-  }, [])
+    async function initSession() {
+      addDebugLog('INIT', 'Starting voice tutor initialization');
+      
+      try {
+        // Check microphone permission
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          setMicrophonePermission(permissionStatus.state);
+          addDebugLog('PERMISSION', `Microphone permission: ${permissionStatus.state}`);
+        } catch (permError) {
+          addDebugLog('WARNING', `Could not check microphone permission: ${permError}`);
+          setMicrophonePermission('unknown');
+        }
 
-  const loadUserData = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) return
+        // Get audio devices
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(device => device.kind === 'audioinput');
+          setAudioDevices(audioInputs);
+          addDebugLog('DEVICES', `Found ${audioInputs.length} audio input devices`);
+        } catch (deviceError) {
+          addDebugLog('ERROR', `Failed to enumerate devices: ${deviceError}`);
+        }
 
-      setUserId(session.user.id)
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          addDebugLog('AUTH', 'No authenticated user, redirecting to login');
+          router.push('/login');
+          return;
+        }
 
-      // Load voice chat sessions only
-      const { data: sessionsData } = await supabase
-        .from('chat_sessions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('mode', 'voice')
-        .order('last_message_at', { ascending: false })
+        addDebugLog('AUTH', `Authenticated user: ${user.id}`);
 
-      setSessions(sessionsData || [])
-    } catch (error) {
-      console.error('Error loading user data:', error)
-    }
-  }
-
-  const loadMessages = async (sessionId: string) => {
-    try {
-      const { data: messagesData } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true })
-
-      setMessages(messagesData || [])
-    } catch (error) {
-      console.error('Error loading messages:', error)
-    }
-  }
-
-  const handleSessionSelect = async (session: ChatSession) => {
-    setSelectedSession(session)
-    await loadMessages(session.id)
-  }
-
-  const handleNewVoiceChat = async () => {
-    if (!userId) return
-
-    try {
-      const { data: newSession, error } = await supabase
+        // Create a new chat session for voice tutor
+        const { data: session, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({
-          user_id: userId,
-          title: 'New Voice Chat',
-          mode: 'voice',
-          last_message_at: new Date().toISOString()
+            user_id: user.id,
+            title: 'Voice Tutor Session',
+            mode: 'voice'
         })
         .select()
-        .single()
+          .single();
 
-      if (error) throw error
+        if (sessionError) {
+          addDebugLog('ERROR', `Failed to create session: ${JSON.stringify(sessionError)}`);
+          setError('Failed to initialize voice tutor session');
+          return;
+        }
 
-      setSessions(prev => [newSession, ...prev])
-      setSelectedSession(newSession)
-      setMessages([])
-    } catch (error) {
-      console.error('Error creating new voice chat:', error)
-    }
-  }
-
-  const sendVoiceMessage = async (audioUrl: string, transcript: string) => {
-    if (!selectedSession) return
-
-    const userMessage: Message = {
-      id: `temp-${Date.now()}`,
-      session_id: selectedSession.id,
-      role: 'user',
-      content: transcript,
-      audio_url: audioUrl,
-      metadata: { isVoice: true },
-      created_at: new Date().toISOString()
+        addDebugLog('SESSION', `Created session: ${session.id}`);
+        setSessionId(session.id);
+        setIsLoading(false);
+        addDebugLog('INIT', 'Voice tutor initialization completed');
+      } catch (err) {
+        addDebugLog('ERROR', `Initialization error: ${err}`);
+        setError('Failed to initialize voice tutor');
+        setIsLoading(false);
+      }
     }
 
-    setMessages(prev => [...prev, userMessage])
-    setIsLoading(true)
+    initSession();
+  }, [router]);
 
+    const handleTranscript = (text: string) => {
+    addDebugLog('TRANSCRIPT', `Received: "${text}"`);
+    setTranscripts(prev => [...prev, text]);
+    setConfidence(0.95); // Mock confidence for demo
+  };
+
+  const handleAIResponse = (text: string) => {
+    addDebugLog('AI_RESPONSE', `Received: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    setAiResponses(prev => [...prev, text]); 
+  };
+
+  const handleStateChange = (state: ConversationState) => {
+    addDebugLog('STATE', `Changed to: ${state}`);
+    setCurrentState(state);
+  };
+
+  const handleError = (error: Error) => {
+    addDebugLog('ERROR', `Voice tutor error: ${error.message}`);
+    setError(error.message);
+  };
+
+  // Test API endpoints
+  const testAPIs = async () => {
+    addDebugLog('TEST', 'Starting API tests...');
+    
+    // Test transcription API
     try {
-      const response = await fetch('/api/chat/messages', {
+      const transcribeResponse = await fetch('/api/voice/transcribe-streaming', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      setApiStatus(prev => ({
+        ...prev,
+        transcription: transcribeResponse.ok ? 'Available' : `Error ${transcribeResponse.status}`
+      }));
+      addDebugLog('TEST', `Transcription API: ${transcribeResponse.status}`);
+    } catch (error) {
+      setApiStatus(prev => ({ ...prev, transcription: 'Failed' }));
+      addDebugLog('TEST', `Transcription API failed: ${error}`);
+    }
+
+    // Test chat API
+    try {
+      const chatResponse = await fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: selectedSession.id,
-          message: transcript,
-          audioUrl,
-          isVoice: true
+          sessionId,
+          message: 'Test message',
+          isVoice: true,
+          test: true
         })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setMessages(prev => {
-          const filtered = prev.filter(m => !m.id.startsWith('temp-'))
-          return [...filtered, data.userMessage, data.aiMessage]
-        })
-
-        // Generate TTS for assistant response
-        if (data.aiMessage?.content) {
-          try {
-            const ttsResponse = await fetch('/api/voice/speak', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                text: data.aiMessage.content,
-                voice: 'alloy'
-              })
-            })
-
-            if (ttsResponse.ok) {
-              const audioBlob = await ttsResponse.blob()
-              const assistantAudioUrl = URL.createObjectURL(audioBlob)
-              
-              // Update the assistant message with audio URL
-              setMessages(prev => prev.map(msg => 
-                msg.id === data.aiMessage.id 
-                  ? { ...msg, audio_url: assistantAudioUrl }
-                  : msg
-              ))
-            }
-          } catch (ttsError) {
-            console.error('TTS error:', ttsError)
-          }
-        }
-      }
+      });
+      setApiStatus(prev => ({
+        ...prev,
+        chat: chatResponse.ok ? 'Available' : `Error ${chatResponse.status}`
+      }));
+      addDebugLog('TEST', `Chat API: ${chatResponse.status}`);
     } catch (error) {
-      console.error('Error sending voice message:', error)
-    } finally {
-      setIsLoading(false)
+      setApiStatus(prev => ({ ...prev, chat: 'Failed' }));
+      addDebugLog('TEST', `Chat API failed: ${error}`);
     }
+
+    // Test TTS API
+    try {
+      const ttsResponse = await fetch('/api/voice/speak-streaming', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Test', test: true })
+      });
+      setApiStatus(prev => ({
+        ...prev,
+        tts: ttsResponse.ok ? 'Available' : `Error ${ttsResponse.status}`
+      }));
+      addDebugLog('TEST', `TTS API: ${ttsResponse.status}`);
+    } catch (error) {
+      setApiStatus(prev => ({ ...prev, tts: 'Failed' }));
+      addDebugLog('TEST', `TTS API failed: ${error}`);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Initializing voice tutor...</p>
+        </div>
+      </div>
+    );
   }
 
-  const handleVoiceRecording = async (audioBlob: Blob, duration: number) => {
-    if (!selectedSession) return
-
-    setIsProcessingVoice(true)
-    try {
-      // First transcribe the audio
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.webm')
-      
-      const transcribeResponse = await fetch('/api/voice/transcribe', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (transcribeResponse.ok) {
-        const { text } = await transcribeResponse.json()
-        
-        // Upload audio file
-        const uploadFormData = new FormData()
-        uploadFormData.append('audio', audioBlob, 'recording.webm')
-        uploadFormData.append('sessionId', selectedSession.id)
-        
-        const uploadResponse = await fetch('/api/voice/upload', {
-          method: 'POST',
-          body: uploadFormData
-        })
-
-        if (uploadResponse.ok) {
-          const { audioUrl } = await uploadResponse.json()
-          await sendVoiceMessage(audioUrl, text)
-        } else {
-          // Send without audio URL if upload fails
-          await sendVoiceMessage('', text)
-        }
-      }
-    } catch (error) {
-      console.error('Voice processing error:', error)
-    } finally {
-      setIsProcessingVoice(false)
-    }
+  if (error) {
+    return (
+      <Alert variant="destructive" className="max-w-2xl mx-auto mt-8">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Sidebar */}
-      {showSidebar && (
-        <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center gap-3 mb-4">
-              <Link href="/dashboard/chat">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <div className="flex items-center gap-2">
-                <Mic className="h-5 w-5 text-primary" />
-                <h1 className="text-lg font-semibold">Voice Tutor</h1>
-              </div>
-            </div>
-            <Button onClick={handleNewVoiceChat} className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              New Voice Chat
-            </Button>
+    <div className="container max-w-4xl mx-auto py-8 px-4">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">AI Voice Tutor</h1>
+        <p className="text-muted-foreground">
+          Have natural conversations with your AI tutor using continuous voice recognition
+        </p>
           </div>
           
-          <ScrollArea className="flex-1">
-            <div className="px-3 py-2">
-              <div className="space-y-1">
-                {sessions.map((session: ChatSession) => (
-                  <div
-                    key={session.id}
-                    className={cn(
-                      "flex items-center justify-between mx-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group",
-                      selectedSession?.id === session.id 
-                        ? "bg-primary/10 text-primary" 
-                        : "hover:bg-gray-100 text-gray-700"
-                    )}
-                    onClick={() => handleSessionSelect(session)}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Volume2 className="h-4 w-4 shrink-0" />
-                      <p className="text-sm font-medium truncate">{session.title}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ScrollArea>
-        </div>
-      )}
+      {/* Feature info */}
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>How it works</AlertTitle>
+        <AlertDescription>
+          Click "Start Conversation" and speak naturally. The AI will listen, understand, and respond to your questions automatically.
+          No need to press any buttons during the conversation!
+        </AlertDescription>
+      </Alert>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {selectedSession ? (
-          <>
-            {/* Header */}
-            <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {!showSidebar && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setShowSidebar(true)}
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Mic className="h-5 w-5 text-primary" />
-                    <h2 className="text-lg font-semibold">{selectedSession.title}</h2>
-                  </div>
-                </div>
-                {showSidebar && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowSidebar(false)}
-                  >
-                    Hide Sidebar
-                  </Button>
-                )}
-              </div>
-            </div>
+      {/* Mode selector */}
+      <Tabs value={mode} onValueChange={(v) => setMode(v as 'continuous' | 'push-to-talk')} className="mb-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="continuous">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Continuous Conversation
+          </TabsTrigger>
+          <TabsTrigger value="push-to-talk" disabled>
+            <Mic className="h-4 w-4 mr-2" />
+            Push to Talk (Coming Soon)
+          </TabsTrigger>
+        </TabsList>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-6">
-              <div className="max-w-4xl mx-auto space-y-6">
-                {messages.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Mic className="h-10 w-10 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">Start a Voice Conversation</h3>
-                    <p className="text-gray-600 mb-6">
-                      Press and hold the microphone to record your question
-                    </p>
-                  </div>
-                ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-4 ${
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      {message.role === 'assistant' && (
-                        <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shrink-0">
-                          <Bot className="h-5 w-5 text-white" />
-                        </div>
-                      )}
-                      
-                      {message.audio_url ? (
-                        <VoiceMessage
-                          audioUrl={message.audio_url}
-                          transcript={message.content}
-                          isAssistant={message.role === 'assistant'}
-                          className="max-w-md"
-                        />
-                      ) : (
-                        <Card className={`max-w-md p-4 ${
-                          message.role === 'user' 
-                            ? 'bg-primary text-white' 
-                            : 'bg-white'
-                        }`}>
-                          <p className="whitespace-pre-wrap">{formatForPreWrap(message.content)}</p>
+        <TabsContent value="continuous" className="space-y-6">
+          {/* Main voice interface */}
+          <VoiceChatLoop
+            sessionId={sessionId}
+            onTranscript={handleTranscript}
+            onAIResponse={handleAIResponse}
+            onStateChange={handleStateChange}
+            onError={handleError}
+            autoRestart={true}
+            timeoutDuration={30000}
+          />
+
+          {/* Conversation history */}
+          {(transcripts.length > 0 || aiResponses.length > 0) && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Conversation History</h3>
+              <ConversationStatus
+                state={currentState}
+                transcript={transcripts[transcripts.length - 1] || ''}
+                aiResponse={aiResponses[aiResponses.length - 1] || ''}
+                confidence={confidence}
+              />
                         </Card>
                       )}
 
-                      {message.role === 'user' && (
-                        <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center shrink-0">
-                          <User className="h-5 w-5 text-white" />
-                        </div>
-                      )}
+          {/* Tips */}
+          <Card className="p-6 bg-muted/50">
+            <h3 className="text-lg font-semibold mb-3">Tips for Best Experience</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>• Speak clearly and at a normal pace</li>
+              <li>• Wait for the AI to finish speaking before asking follow-up questions</li>
+              <li>• The system will automatically detect when you start and stop speaking</li>
+              <li>• Use headphones to prevent echo and improve recognition</li>
+              <li>• Make sure you're in a quiet environment for best results</li>
+            </ul>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="push-to-talk">
+          <Card className="p-12 text-center text-muted-foreground">
+            <MicOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Push-to-talk mode coming soon!</p>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Enhanced Debug Panel */}
+      <Card className="p-4 mt-6 bg-muted/30">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold">Debug Console</h4>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={testAPIs}
+              disabled={!sessionId}
+            >
+              Test APIs
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+            >
+              {showDebug ? 'Hide' : 'Show'} Details
+            </Button>
+          </div>
+        </div>
+
+        {showDebug && (
+          <div className="space-y-4">
+            {/* System Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h5 className="text-xs font-semibold mb-2">System Status</h5>
+                <div className="text-xs space-y-1 font-mono">
+                  <p>Session ID: {sessionId || 'Not created'}</p>
+                  <p>Current State: <span className="font-bold">{currentState}</span></p>
+                  <p>Microphone: <span className={microphonePermission === 'granted' ? 'text-green-600' : 'text-red-600'}>{microphonePermission}</span></p>
+                  <p>Audio Devices: {audioDevices.length}</p>
+                  <p>Transcripts: {transcripts.length}</p>
+                  <p>AI Responses: {aiResponses.length}</p>
+                </div>
+              </div>
+
+              <div>
+                <h5 className="text-xs font-semibold mb-2">API Status</h5>
+                <div className="text-xs space-y-1 font-mono">
+                  <p>Transcription: <span className={apiStatus.transcription === 'Available' ? 'text-green-600' : 'text-red-600'}>{apiStatus.transcription}</span></p>
+                  <p>Chat API: <span className={apiStatus.chat === 'Available' ? 'text-green-600' : 'text-red-600'}>{apiStatus.chat}</span></p>
+                  <p>TTS API: <span className={apiStatus.tts === 'Available' ? 'text-green-600' : 'text-red-600'}>{apiStatus.tts}</span></p>
+                </div>
+              </div>
+            </div>
+
+            {/* Debug Logs */}
+            <div>
+              <h5 className="text-xs font-semibold mb-2">Real-time Logs</h5>
+              <div className="bg-black text-green-400 p-3 rounded text-xs font-mono max-h-40 overflow-y-auto">
+                {debugLogs.length === 0 ? (
+                  <p className="text-gray-500">No logs yet...</p>
+                ) : (
+                  debugLogs.slice(-10).map((log, index) => (
+                    <div key={index} className="flex gap-2">
+                      <span className="text-gray-500">{log.timestamp}</span>
+                      <span className={
+                        log.type === 'ERROR' ? 'text-red-400' :
+                        log.type === 'STATE' ? 'text-blue-400' :
+                        log.type === 'TRANSCRIPT' ? 'text-yellow-400' :
+                        log.type === 'AI_RESPONSE' ? 'text-purple-400' :
+                        'text-green-400'
+                      }>[{log.type}]</span>
+                      <span>{log.message}</span>
                     </div>
                   ))
                 )}
               </div>
-            </ScrollArea>
+            </div>
 
-            {/* Voice Input */}
-            <div className="bg-white/80 backdrop-blur-sm border-t border-gray-200 p-6">
-              <div className="max-w-4xl mx-auto">
-                <VoiceRecorder
-                  onRecordingComplete={handleVoiceRecording}
-                  isRecording={isRecording}
-                  onRecordingStart={() => setIsRecording(true)}
-                  onRecordingStop={() => setIsRecording(false)}
-                  disabled={isLoading || isProcessingVoice}
-                  className="bg-white/50"
-                />
-                
-                {(isLoading || isProcessingVoice) && (
-                  <div className="text-center mt-4">
-                    <p className="text-sm text-gray-600">
-                      {isProcessingVoice ? 'Processing your voice...' : 'Getting response...'}
+            {/* Audio Devices */}
+            {audioDevices.length > 0 && (
+              <div>
+                <h5 className="text-xs font-semibold mb-2">Audio Input Devices</h5>
+                <div className="text-xs space-y-1">
+                  {audioDevices.map((device, index) => (
+                    <p key={index} className="font-mono">
+                      {device.label || `Device ${index + 1}`} ({device.deviceId.substring(0, 8)}...)
                     </p>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mic className="h-12 w-12 text-primary" />
+            )}
+
+            {/* Recent Conversation */}
+            {(transcripts.length > 0 || aiResponses.length > 0) && (
+              <div>
+                <h5 className="text-xs font-semibold mb-2">Recent Conversation</h5>
+                <div className="text-xs space-y-2 max-h-32 overflow-y-auto">
+                  {transcripts.slice(-3).map((transcript, index) => (
+                    <div key={`t-${index}`} className="bg-blue-100 p-2 rounded">
+                      <strong>You:</strong> {transcript}
+                    </div>
+                  ))}
+                  {aiResponses.slice(-3).map((response, index) => (
+                    <div key={`r-${index}`} className="bg-green-100 p-2 rounded">
+                      <strong>AI:</strong> {response.substring(0, 100)}{response.length > 100 ? '...' : ''}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h2 className="text-2xl font-semibold mb-3">Welcome to StudySpeak</h2>
-              <p className="text-gray-600 mb-6 max-w-md">
-                Your AI voice tutor is ready to help you learn through natural conversation. 
-                Start a new voice chat to begin.
-              </p>
-              <Button onClick={handleNewVoiceChat} size="lg">
-                <Plus className="h-5 w-5 mr-2" />
-                Start Voice Chat
-              </Button>
-            </div>
+            )}
           </div>
         )}
-      </div>
+      </Card>
     </div>
-  )
+  );
 } 

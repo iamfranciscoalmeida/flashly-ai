@@ -23,12 +23,14 @@ export const config = {
    */
   waitlist: {
     title: 'Your AI Study Companion is Almost Ready',
-    subtitle: 'Join the waitlist and be first to try flashcards, quizzes, and smart study sessions with AI.',
-    successMessage: 'Thanks! You\'re on the waitlist!',
+    subtitle: 'Join the waitlist and be first to try StudyWithAI - the revolutionary platform that transforms PDFs into engaging video lessons and provides AI-powered tutoring.',
+    successMessage: 'Thanks! You\'re now on our waitlist. We\'ll notify you as soon as we launch!',
     features: [
-      'AI-generated flashcards',
-      'Smart quizzes', 
-      'Spaced repetition'
+      'AI-generated flashcards from your documents',
+      'Voice AI tutor for interactive learning',
+      'PDF to video transformation technology',
+      'Smart quizzes tailored to your content',
+      'Spaced repetition learning system'
     ]
   }
 } as const;
@@ -41,4 +43,31 @@ export const isWaitlistMode = () => config.isWaitlistMode;
 /**
  * Helper function to get waitlist config
  */
-export const getWaitlistConfig = () => config.waitlist; 
+export const getWaitlistConfig = () => config.waitlist;
+
+// Utility function to check waitlist mode and return appropriate response
+export function checkWaitlistMode() {
+  if (config.isWaitlistMode) {
+    return {
+      isWaitlistMode: true,
+      response: new Response(
+        JSON.stringify({
+          error: "Service unavailable - We're in waitlist mode. Join our waitlist to be notified when we launch!",
+          code: "WAITLIST_MODE_ACTIVE",
+          waitlistUrl: "/",
+        }),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+    };
+  }
+  
+  return {
+    isWaitlistMode: false,
+    response: null
+  };
+} 
