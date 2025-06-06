@@ -51,7 +51,7 @@ export interface StudyContentMetadata {
   tokensUsed: number;
   processingTime: number;
   cached: boolean;
-  cacheKey: string;
+  cacheKey?: string;
   sourceReferences: string[];
   keyTerms: string[];
   estimatedReadTime?: number;

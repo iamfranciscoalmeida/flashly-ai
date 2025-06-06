@@ -392,7 +392,7 @@ export function EnhancedStudyGenerator({
                  tokensUsed: generatedContent['tiered-summary'].metadata.tokensUsed,
                  processingTime: generatedContent['tiered-summary'].metadata.processingTime,
                  cached: generatedContent['tiered-summary'].metadata.cached,
-                 cacheKey: generatedContent['tiered-summary'].metadata.cacheKey || '',
+                 cacheKey: generatedContent['tiered-summary'].metadata.cacheKey,
                  sourceReferences: [],
                  keyTerms: []
                }}
@@ -413,6 +413,7 @@ export function EnhancedStudyGenerator({
               metadata={{
                 tokensUsed: generatedContent['structured-notes'].metadata.tokensUsed,
                 processingTime: generatedContent['structured-notes'].metadata.processingTime,
+                cacheKey: generatedContent['structured-notes'].metadata.cacheKey,
                 cached: generatedContent['structured-notes'].metadata.cached,
                 sourceReferences: [],
                 keyTerms: []
