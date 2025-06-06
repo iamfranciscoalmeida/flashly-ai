@@ -13,7 +13,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { sessionId, message, attachments, context } = await request.json();
+    const { 
+      sessionId, 
+      message, 
+      attachments, 
+      context,
+      isVoice = false,
+      isContinuous = false,
+      audioUrl,
+      vadConfidence 
+    } = await request.json();
 
     if (!sessionId || !message) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -32,8 +41,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session or session not found' }, { status: 403 });
     }
 
-    // Save user message
+    // Save user message with voice metadata
     let userMessage = null;
+    const metadata: any = attachments ? { attachments } : {};
+    
+    if (isVoice) {
+      metadata.isVoice = true;
+      metadata.isContinuous = isContinuous;
+      if (audioUrl) metadata.audioUrl = audioUrl;
+      if (vadConfidence !== undefined) metadata.vadConfidence = vadConfidence;
+    }
+
     const { data: userMsgData, error: userMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -41,7 +59,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         role: 'user',
         content: message,
-        metadata: attachments ? { attachments } : null
+        metadata: Object.keys(metadata).length > 0 ? metadata : null
       })
       .select()
       .single();
@@ -85,10 +103,21 @@ export async function POST(request: NextRequest) {
       content: msg.content
     })) || [];
 
-    // Add system prompt
+    // Enhanced system prompt for continuous voice conversations
     const systemPrompt = {
       role: 'system' as const,
       content: `You are an AI tutor designed to help students learn effectively. 
+      ${isContinuous ? `
+      You are currently in a continuous voice conversation. Keep these guidelines in mind:
+      - Keep responses natural and conversational for voice
+      - Use shorter sentences and natural speech patterns
+      - Ask follow-up questions to maintain engagement
+      - Acknowledge the user's questions directly
+      - Avoid overly technical jargon unless necessary
+      - If the transcription seems unclear (confidence < 0.8), politely ask for clarification
+      - Keep responses concise but informative (aim for 2-3 sentences for most responses)
+      - Use verbal cues like "Let me explain..." or "That's a great question!" to sound more natural
+      ` : ''}
       Your responses should be:
       - Clear and easy to understand
       - Educational and informative
@@ -105,15 +134,25 @@ export async function POST(request: NextRequest) {
       [systemPrompt, ...conversationHistory],
       {
         model: 'gpt-4-turbo-preview',
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: isContinuous ? 0.8 : 0.7, // Slightly higher temperature for voice
+        max_tokens: isContinuous ? 500 : 2000, // Shorter responses for voice
         presence_penalty: 0.1,
         frequency_penalty: 0.1,
       }
     );
 
-    // Save AI response
+    // Save AI response with voice metadata
     let aiMessage = null;
+    const aiMetadata: any = {
+      model: 'gpt-4-turbo-preview',
+      response_length: aiResponse.length
+    };
+    
+    if (isVoice) {
+      aiMetadata.isVoice = true;
+      aiMetadata.isContinuous = isContinuous;
+    }
+
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -121,10 +160,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         role: 'assistant',
         content: aiResponse,
-        metadata: {
-          model: 'gpt-4-turbo-preview',
-          response_length: aiResponse.length
-        }
+        metadata: aiMetadata
       })
       .select()
       .single();
