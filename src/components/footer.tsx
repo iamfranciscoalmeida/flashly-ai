@@ -7,7 +7,7 @@ export default function Footer() {
   return (
     <footer className="bg-gray-50 border-t border-gray-100">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-12">
           {/* Product Column */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Product</h3>
@@ -44,57 +44,18 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Study Resources Column */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4">
-              Study Resources
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Flashcard Tips
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Study Techniques
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Memory Methods
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Student Blog
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Support Column */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Support</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Help Center
+                <Link href="/faq" className="text-gray-600 hover:text-blue-600">
+                  FAQs
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="/contact" className="text-gray-600 hover:text-blue-600">
                   Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Community Forum
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
-                  Tutorials
                 </Link>
               </li>
             </ul>
@@ -105,12 +66,12 @@ export default function Footer() {
             <h3 className="font-semibold text-gray-900 mb-4">Legal</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="/privacy-policy" className="text-gray-600 hover:text-blue-600">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="/terms-of-service" className="text-gray-600 hover:text-blue-600">
                   Terms of Service
                 </Link>
               </li>
