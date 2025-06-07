@@ -15,17 +15,20 @@ import {
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { GoogleDrivePicker } from '@/components/google-drive-picker';
 
 interface EmptyStateInterfaceProps {
   onCreateSession: (type: string, data: any) => void;
   isCreating?: boolean;
+  sessionId?: string;
 }
 
-export function EmptyStateInterface({ onCreateSession, isCreating }: EmptyStateInterfaceProps) {
+export function EmptyStateInterface({ onCreateSession, isCreating, sessionId }: EmptyStateInterfaceProps) {
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadType, setUploadType] = useState<'pdf' | 'image'>('pdf');
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
 
   const uploadOptions = [
     {
@@ -65,8 +68,7 @@ export function EmptyStateInterface({ onCreateSession, isCreating }: EmptyStateI
       description: 'Import from your Drive',
       color: 'bg-yellow-500',
       action: () => {
-        // TODO: Implement Google Drive integration
-        console.log('Google Drive integration coming soon');
+        setShowDrivePicker(true);
       }
     }
   ];
@@ -86,6 +88,10 @@ export function EmptyStateInterface({ onCreateSession, isCreating }: EmptyStateI
     onCreateSession('youtube', { url: youtubeUrl });
     setYoutubeUrl('');
     setShowYoutubeDialog(false);
+  };
+
+  const handleDriveFileSelect = (file: any) => {
+    onCreateSession('drive', { file });
   };
 
   return (
@@ -248,6 +254,14 @@ export function EmptyStateInterface({ onCreateSession, isCreating }: EmptyStateI
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Google Drive Picker */}
+      <GoogleDrivePicker
+        open={showDrivePicker}
+        onClose={() => setShowDrivePicker(false)}
+        onSelect={handleDriveFileSelect}
+        sessionId={sessionId}
+      />
     </>
   );
 }
