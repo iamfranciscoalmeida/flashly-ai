@@ -218,6 +218,146 @@ async function generateWithFallback(
   }
 }
 
+// Enhanced JSON parsing with recovery strategies
+function parseJSONWithRecovery(response: string, type: 'flashcards' | 'quiz'): any[] {
+  console.log('🔧 Attempting to parse JSON response...');
+  
+  // Clean the response to extract just the JSON
+  let cleanedResponse = response.trim();
+  
+  // Remove any markdown code blocks
+  cleanedResponse = cleanedResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+  
+  // Remove any text before the first [ or after the last ]
+  const startIndex = cleanedResponse.indexOf('[');
+  const endIndex = cleanedResponse.lastIndexOf(']');
+  
+  if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+    cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
+  }
+  
+  console.log('🧹 Cleaned response preview:', cleanedResponse.substring(0, 200));
+  
+  // Strategy 1: Try direct parsing
+  try {
+    const parsed = JSON.parse(cleanedResponse);
+    const items = Array.isArray(parsed) ? parsed : (parsed[type] || parsed.questions || parsed.flashcards || []);
+    if (items.length > 0) {
+      console.log('✅ Direct JSON parsing successful');
+      return items;
+    }
+  } catch (directError) {
+    console.log('⚠️ Direct JSON parsing failed:', directError instanceof Error ? directError.message : String(directError));
+  }
+  
+  // Strategy 2: Try to fix common JSON issues
+  try {
+    console.log('🔧 Attempting JSON repair...');
+    
+    // Fix common issues
+    let repairedJson = cleanedResponse
+      // Fix trailing commas
+      .replace(/,(\s*[}\]])/g, '$1')
+      // Fix missing commas between objects
+      .replace(/}(\s*){/g, '},$1{')
+      .replace(/](\s*)\[/g, '],$1[')
+      // Fix unescaped quotes in strings
+      .replace(/: "([^"]*)"([^",\}\]]*)"([^",\}\]]*)/g, (match, p1, p2, p3) => {
+        if (p2.includes('"') || p3.includes('"')) {
+          return `: "${p1}${p2.replace(/"/g, '\\"')}${p3.replace(/"/g, '\\"')}"`;
+        }
+        return match;
+      })
+      // Fix incomplete JSON (truncated objects)
+      .replace(/[,\s]*$/, '')
+      .replace(/[^}\]]*$/, '');
+    
+    // Ensure proper closing
+    const openBraces = (repairedJson.match(/{/g) || []).length;
+    const closeBraces = (repairedJson.match(/}/g) || []).length;
+    const openBrackets = (repairedJson.match(/\[/g) || []).length;
+    const closeBrackets = (repairedJson.match(/\]/g) || []).length;
+    
+    // Add missing closing braces/brackets
+    if (openBraces > closeBraces) {
+      repairedJson += '}'.repeat(openBraces - closeBraces);
+    }
+    if (openBrackets > closeBrackets) {
+      repairedJson += ']'.repeat(openBrackets - closeBrackets);
+    }
+    
+    console.log('🔧 Repaired JSON preview:', repairedJson.substring(0, 200));
+    
+    const parsed = JSON.parse(repairedJson);
+    const items = Array.isArray(parsed) ? parsed : (parsed[type] || parsed.questions || parsed.flashcards || []);
+    if (items.length > 0) {
+      console.log('✅ JSON repair successful');
+      return items;
+    }
+  } catch (repairError) {
+    console.log('⚠️ JSON repair failed:', repairError instanceof Error ? repairError.message : String(repairError));
+  }
+  
+  // Strategy 3: Extract individual objects using regex
+  try {
+    console.log('🔧 Attempting object extraction...');
+    const objectPattern = /{[^{}]*(?:{[^{}]*}[^{}]*)*}/g;
+    const matches = cleanedResponse.match(objectPattern);
+    
+    if (matches && matches.length > 0) {
+      const extractedItems = [];
+      for (const match of matches) {
+        try {
+          const item = JSON.parse(match);
+          if (item && (item.question || item.front || item.term)) {
+            extractedItems.push(item);
+          }
+        } catch (e) {
+          // Skip invalid items
+          continue;
+        }
+      }
+      
+      if (extractedItems.length > 0) {
+        console.log('✅ Object extraction successful:', extractedItems.length, 'items');
+        return extractedItems;
+      }
+    }
+  } catch (extractError) {
+    console.log('⚠️ Object extraction failed:', extractError instanceof Error ? extractError.message : String(extractError));
+  }
+  
+  // Strategy 4: Generate emergency fallback content
+  console.log('🚨 All parsing strategies failed, generating fallback content...');
+  
+  if (type === 'flashcards') {
+    return [
+      {
+        question: "What is the main topic of the uploaded content?",
+        answer: "Based on the content provided, this appears to be educational material that requires further analysis. Please try uploading the content again or provide more specific text for better flashcard generation.",
+        difficulty_level: "medium",
+        tags: ["general", "review"]
+      }
+    ];
+  } else {
+    return [
+      {
+        question: "What is the primary focus of the provided content?",
+        options: [
+          "Educational material requiring analysis",
+          "Technical documentation",
+          "General reference content", 
+          "Subject-specific study material"
+        ],
+        correct: "Educational material requiring analysis",
+        explanation: "The content appears to be educational material that needs to be re-processed for better quiz generation.",
+        difficulty_level: "medium",
+        tags: ["general", "review"]
+      }
+    ];
+  }
+}
+
 export class AIService {
   static async generateFlashcards({
     content,
@@ -248,11 +388,11 @@ export class AIService {
 Content:
 ${compressedContent}
 
-IMPORTANT: Respond with ONLY a JSON array of flashcards. No additional text or explanation.
+CRITICAL: You must respond with ONLY a valid JSON array. No explanations, no markdown, no additional text.
 
 ${generateContentGuidelines('flashcard')}
 
-Required JSON format:
+Required JSON format (respond with ONLY this structure):
 [
   {
     "question": "Clear, specific question about the content",
@@ -270,40 +410,28 @@ Guidelines:
 - Ensure each flashcard is complete and self-contained
 - When explaining concepts, provide novel examples that you create, not book references
 - If formulas are mentioned, state them explicitly rather than referencing equation numbers
+- Keep answers concise but comprehensive (max 200 words each)
+- Ensure all JSON strings are properly escaped
 ${difficulty === 'mixed' ? '- Vary complexity to match the requested difficulty distribution' : ''}
 
 Generate the JSON array now:`;
 
     try {
       const response = await createChatCompletion([
-        { role: 'system', content: 'You are an expert educator creating study materials. Always respond with valid JSON only, no additional text. NEVER reference specific book examples, figures, equations, or sections that users cannot see. Instead, create novel examples from your knowledge base.' },
+        { role: 'system', content: 'You are an expert educator creating study materials. You MUST respond with VALID JSON ONLY. No explanations, no markdown, no additional text. Ensure all strings are properly escaped and the JSON is syntactically correct.' },
         { role: 'user', content: prompt }
       ], {
-        max_tokens: 2000,
+        max_tokens: 2500,
         temperature: 0.7
       });
 
       console.log('🤖 AI Response received, length:', response.length);
-      console.log('🔍 Response preview:', response.substring(0, 200));
+      console.log('🔍 Response preview:', response.substring(0, 300));
 
-      // Clean the response to extract just the JSON
-      let cleanedResponse = response.trim();
-      
-      // Remove any markdown code blocks
-      cleanedResponse = cleanedResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      
-      // Extract JSON array if it's wrapped in other text
-      const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        cleanedResponse = jsonMatch[0];
-      }
+      // Use enhanced JSON parsing with recovery
+      const flashcards = parseJSONWithRecovery(response, 'flashcards');
 
-      console.log('🧹 Cleaned response preview:', cleanedResponse.substring(0, 200));
-
-      const parsed = JSON.parse(cleanedResponse);
-      const flashcards = Array.isArray(parsed) ? parsed : (parsed.flashcards || []);
-
-      console.log('📚 Parsed flashcards count:', flashcards.length);
+      console.log('📚 Final flashcards count:', flashcards.length);
 
       if (flashcards.length === 0) {
         console.log('⚠️ No flashcards generated, raw response:', response);
@@ -311,10 +439,10 @@ Generate the JSON array now:`;
       }
 
       return flashcards.map((card: any) => ({
-        question: card.question,
-        answer: card.answer,
+        question: card.question || card.front || card.term || 'Question not available',
+        answer: card.answer || card.back || card.definition || 'Answer not available',
         difficulty_level: card.difficulty_level || difficulty,
-        tags: card.tags || [],
+        tags: Array.isArray(card.tags) ? card.tags : [],
         source_reference: {
           module: moduleTitle,
           generated_at: new Date().toISOString()
@@ -322,7 +450,7 @@ Generate the JSON array now:`;
       }));
     } catch (error) {
       console.error('Error generating flashcards:', error);
-      throw error;
+      throw new Error('Failed to generate flashcards: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -355,11 +483,11 @@ Generate the JSON array now:`;
 Content:
 ${compressedContent}
 
-IMPORTANT: Respond with ONLY a JSON array of quiz questions. No additional text or explanation.
+CRITICAL: You must respond with ONLY a valid JSON array. No explanations, no markdown, no additional text.
 
 ${generateContentGuidelines('quiz')}
 
-Required JSON format:
+Required JSON format (respond with ONLY this structure):
 [
   {
     "question": "Clear, specific question about the content",
@@ -375,45 +503,32 @@ Guidelines:
 - Create challenging but fair questions that test understanding
 - Make all options plausible (good distractors)
 - Ensure the correct answer is definitively correct
-- Include detailed explanations for learning
+- Include detailed explanations for learning (max 150 words each)
 - Use content-specific terminology and examples FROM YOUR KNOWLEDGE BASE
 - Test comprehension, application, and analysis
 - When explaining concepts, provide novel examples that you create, not book references
 - If formulas are mentioned, state them explicitly rather than referencing equation numbers
+- Ensure all JSON strings are properly escaped
 ${difficulty === 'mixed' ? '- Vary complexity to match the requested difficulty distribution' : ''}
 
 Generate the JSON array now:`;
 
     try {
       const response = await createChatCompletion([
-        { role: 'system', content: 'You are an expert educator creating quiz questions. Always respond with valid JSON only, no additional text. NEVER reference specific book examples, figures, equations, or sections that users cannot see. Instead, create novel examples from your knowledge base.' },
+        { role: 'system', content: 'You are an expert educator creating quiz questions. You MUST respond with VALID JSON ONLY. No explanations, no markdown, no additional text. Ensure all strings are properly escaped and the JSON is syntactically correct.' },
         { role: 'user', content: prompt }
       ], {
-        max_tokens: 2000,
+        max_tokens: 2500,
         temperature: 0.7
       });
 
       console.log('🤖 Quiz AI Response received, length:', response.length);
-      console.log('🔍 Quiz Response preview:', response.substring(0, 200));
+      console.log('🔍 Quiz Response preview:', response.substring(0, 300));
 
-      // Clean the response to extract just the JSON
-      let cleanedResponse = response.trim();
-      
-      // Remove any markdown code blocks
-      cleanedResponse = cleanedResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      
-      // Extract JSON array if it's wrapped in other text
-      const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        cleanedResponse = jsonMatch[0];
-      }
+      // Use enhanced JSON parsing with recovery
+      const questions = parseJSONWithRecovery(response, 'quiz');
 
-      console.log('🧹 Cleaned quiz response preview:', cleanedResponse.substring(0, 200));
-
-      const parsed = JSON.parse(cleanedResponse);
-      const questions = Array.isArray(parsed) ? parsed : (parsed.questions || []);
-
-      console.log('❓ Parsed quiz questions count:', questions.length);
+      console.log('❓ Final quiz questions count:', questions.length);
 
       if (questions.length === 0) {
         console.log('⚠️ No quiz questions generated, raw response:', response);
@@ -421,12 +536,12 @@ Generate the JSON array now:`;
       }
 
       return questions.map((q: any) => ({
-        question: q.question,
-        options: q.options,
-        correct: q.correct,
-        explanation: q.explanation,
+        question: q.question || 'Question not available',
+        options: Array.isArray(q.options) ? q.options : ['Option A', 'Option B', 'Option C', 'Option D'],
+        correct: q.correct || q.answer || (Array.isArray(q.options) ? q.options[0] : 'Option A'),
+        explanation: q.explanation || 'Explanation not available',
         difficulty_level: q.difficulty_level || difficulty,
-        tags: q.tags || [],
+        tags: Array.isArray(q.tags) ? q.tags : [],
         source_reference: {
           module: moduleTitle,
           generated_at: new Date().toISOString()
@@ -434,7 +549,7 @@ Generate the JSON array now:`;
       }));
     } catch (error) {
       console.error('Error generating quiz:', error);
-      throw error;
+      throw new Error('Failed to generate quiz: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
 

@@ -63,7 +63,20 @@ export function useConversationStateMachine({
     { from: ConversationState.SPEAKING, to: ConversationState.LISTENING },
     { from: ConversationState.LISTENING, to: ConversationState.IDLE },
     { from: ConversationState.ERROR, to: ConversationState.IDLE },
-    { from: ConversationState.TIMEOUT, to: ConversationState.IDLE }
+    { from: ConversationState.TIMEOUT, to: ConversationState.IDLE },
+    // Add timeout transitions from all active states
+    { from: ConversationState.LISTENING, to: ConversationState.TIMEOUT },
+    { from: ConversationState.RECORDING, to: ConversationState.TIMEOUT },
+    { from: ConversationState.PROCESSING, to: ConversationState.TIMEOUT },
+    { from: ConversationState.SPEAKING, to: ConversationState.TIMEOUT },
+    // Add error transitions from all states
+    { from: ConversationState.LISTENING, to: ConversationState.ERROR },
+    { from: ConversationState.RECORDING, to: ConversationState.ERROR },
+    { from: ConversationState.PROCESSING, to: ConversationState.ERROR },
+    { from: ConversationState.SPEAKING, to: ConversationState.ERROR },
+    // Add recovery transitions
+    { from: ConversationState.RECORDING, to: ConversationState.LISTENING },
+    { from: ConversationState.PROCESSING, to: ConversationState.LISTENING }
   ];
 
   // Check if transition is valid

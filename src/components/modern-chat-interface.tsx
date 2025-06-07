@@ -1313,7 +1313,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
   if (isLoadingHistory) {
     return (
       <TooltipProvider>
-        <div className="h-full flex bg-white">
+        <div className="h-full flex bg-background">
           {/* Mobile sidebar toggle */}
           <Button
             variant="outline"
@@ -1344,10 +1344,10 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                 initial={{ x: -320, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -320, opacity: 0 }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="w-80 bg-gray-50 border-r flex flex-col h-full z-50 md:relative md:z-auto fixed"
-              >
-                <div className="p-4 border-b bg-white">
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="w-80 bg-background border-r border-border flex flex-col h-full z-50 md:relative md:z-auto fixed"
+          >
+            <div className="p-4 border-b border-border bg-background">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">Sessions</h3>
                     <Button size="sm" onClick={createNewSession} className="rounded-lg">
@@ -1361,7 +1361,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                       const groupedSessions = groupSessionsByDate(sessions);
                       return Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
                         <div key={groupName} className="mb-6">
-                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-4">
+                          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-4">
                             {groupName}
                           </h3>
                           <div className="space-y-1">
@@ -1375,9 +1375,9 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                 <div
                                   className={cn(
                                     "flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors group relative max-w-full",
-                                    currentSession?.id === session.id 
-                                      ? "bg-gray-200 text-gray-900" 
-                                      : "hover:bg-gray-100 text-gray-700"
+                                                                    currentSession?.id === session.id 
+                                  ? "bg-accent text-accent-foreground" 
+                                  : "hover:bg-accent/50 text-foreground"
                                   )}
                                   onClick={() => selectSession(session)}
                                 >
@@ -1395,7 +1395,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                             cancelRename();
                                           }
                                         }}
-                                        className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-white focus:border focus:border-blue-500 rounded px-1"
+                                        className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-background focus:border focus:border-primary rounded px-1"
                                         autoFocus
                                       />
                                     ) : (
@@ -1407,7 +1407,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-gray-200 flex-shrink-0"
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-accent flex-shrink-0"
                                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                       >
                                         <MoreVertical className="h-3 w-3 text-gray-500" />
@@ -1458,7 +1458,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           </AnimatePresence>
 
           {/* Loading content */}
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
+          <div className="flex-1 flex items-center justify-center bg-muted">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-lg">Loading conversation...</p>
@@ -1472,7 +1472,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
   // Main chat interface
   return (
     <TooltipProvider>
-      <div className="h-full flex bg-white">
+      <div className="h-full flex bg-background overflow-hidden">
         {/* Mobile sidebar toggle */}
         <Button
           variant="outline"
@@ -1504,9 +1504,9 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -320, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-80 bg-gray-50 border-r flex flex-col h-full z-50 md:relative md:z-auto fixed"
+              className="w-80 bg-background border-r border-border flex flex-col h-full z-50 md:relative md:z-auto fixed"
             >
-              <div className="p-4 border-b bg-white">
+              <div className="p-4 border-b border-border bg-background">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Sessions</h3>
                   <Button size="sm" onClick={createNewSession} className="rounded-lg">
@@ -1520,7 +1520,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                     const groupedSessions = groupSessionsByDate(sessions);
                     return Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
                       <div key={groupName} className="mb-6">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-4">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-4">
                           {groupName}
                         </h3>
                         <div className="space-y-1">
@@ -1535,8 +1535,8 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                 className={cn(
                                   "flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors group relative max-w-full",
                                   currentSession?.id === session.id 
-                                    ? "bg-gray-200 text-gray-900" 
-                                    : "hover:bg-gray-100 text-gray-700"
+                                    ? "bg-accent text-accent-foreground" 
+                                    : "hover:bg-accent/50 text-foreground"
                                 )}
                                 onClick={() => selectSession(session)}
                               >
@@ -1554,7 +1554,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                           cancelRename();
                                         }
                                       }}
-                                      className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-white focus:border focus:border-blue-500 rounded px-1"
+                                                                              className="text-sm font-medium bg-transparent border-none outline-none w-full focus:bg-background focus:border focus:border-primary rounded px-1"
                                       autoFocus
                                     />
                                   ) : (
@@ -1566,7 +1566,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-gray-200 flex-shrink-0"
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 hover:bg-accent flex-shrink-0"
                                       onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                     >
                                       <MoreVertical className="h-3 w-3 text-gray-500" />
@@ -1630,12 +1630,12 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-gray-100/90 backdrop-blur-sm z-50 flex items-center justify-center"
+              className="absolute inset-0 bg-muted/90 backdrop-blur-sm z-50 flex items-center justify-center"
             >
-              <div className="bg-white rounded-2xl p-8 shadow-2xl border-2 border-dashed border-black">
-                <Upload className="h-16 w-16 text-black mx-auto mb-4" />
+              <div className="bg-background rounded-2xl p-8 shadow-2xl border-2 border-dashed border-border">
+                <Upload className="h-16 w-16 text-foreground mx-auto mb-4" />
                 <p className="text-lg font-semibold">Drop your files here</p>
-                <p className="text-sm text-gray-600 mt-2">We support PDFs, documents, images, and more</p>
+                <p className="text-sm text-muted-foreground mt-2">We support PDFs, documents, images, and more</p>
               </div>
             </motion.div>
           )}
@@ -1644,7 +1644,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
         {/* Document Viewer Panel */}
         {uploadedDocument && (
           <div className="w-1/2 border-r flex flex-col">
-            <div className="border-b px-4 py-3 bg-gray-50">
+            <div className="border-b border-border px-4 py-3 bg-muted">
               <h3 className={cn(
                 "font-medium text-sm text-gray-700",
                 showSidebar ? "ml-12" : "ml-12"
@@ -1663,92 +1663,22 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           </div>
         )}
 
-        {/* Sessions button positioned on left when in PDF mode */}
-        {uploadedDocument && (
-          <Button
-            variant="default"
-            size="sm"
-            className={cn(
-              "fixed top-4 z-30 w-10 h-10 p-0 transition-all duration-300 shadow-lg",
-              "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 hover:text-gray-900",
-              showSidebar ? "left-[336px]" : "left-4"
-            )}
-            onClick={() => setShowSidebar(!showSidebar)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-        )}
+        {/* Floating Sidebar Toggle Button */}
+        <Button
+          variant="default"
+          size="sm"
+          className={cn(
+            "fixed top-[100px] z-30 w-10 h-10 p-0 transition-all duration-300 shadow-lg",
+            "bg-background hover:bg-muted border border-border text-foreground hover:text-foreground",
+            showSidebar ? "left-[336px]" : "left-4"
+          )}
+          onClick={() => setShowSidebar(!showSidebar)}
+        >
+          {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
 
         {/* Chat Panel */}
-        <div className={cn("flex flex-col h-full", uploadedDocument ? "w-1/2" : "w-full")}>
-          {/* Header */}
-          <div className="border-b px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-sm flex-shrink-0">
-            <div className="flex items-center gap-4">
-              {/* Only show Sessions button in header when NOT in PDF mode */}
-              {!uploadedDocument && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={() => setShowSidebar(!showSidebar)}
-                >
-                  <Menu className="h-4 w-4" />
-                  Sessions ({sessions.length})
-                </Button>
-              )}
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-black" />
-                AI Study Assistant
-              </h2>
-              {/* <Badge variant="secondary">GPT-4 Powered</Badge> */}
-            </div>
-          </div>
-
-        {/* AI Tools Bar */}
-        <div className="border-b px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleOpenSettingsModal('flashcards')}
-              disabled={isLoading}
-              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
-            >
-              <Sparkles className="h-4 w-4" />
-              Flashcards
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleOpenSettingsModal('quiz')}
-              disabled={isLoading}
-              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
-            >
-              <Brain className="h-4 w-4" />
-              Quiz
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generateContent('summary')}
-              disabled={isLoading}
-              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              Summary
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generateContent('notes')}
-              disabled={isLoading}
-              className="flex items-center gap-2 hover:bg-black hover:text-white transition-colors"
-            >
-              <StickyNote className="h-4 w-4" />
-              Study Notes
-            </Button>
-          </div>
-        </div>
+        <div className={cn("flex flex-col h-full overflow-hidden bg-muted", uploadedDocument ? "w-1/2" : "w-full")}>
 
         {/* Messages Area - Takes remaining space */}
         <div className="flex-1 min-h-0 overflow-hidden">
@@ -1756,13 +1686,13 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
           <div className="py-4 max-w-4xl mx-auto">
             {/* Landing page when no messages */}
             {showLandingPage && messages.length === 0 && !isLoadingHistory && (
-              <div className="flex flex-col h-full min-h-[600px] bg-gradient-to-b from-white to-gray-50">
+              <div className="flex flex-col h-full min-h-[600px] bg-muted">
                 {/* Hero Section */}
                 <div className="text-center py-12 px-6">
                   <motion.h1 
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-black bg-clip-text text-transparent"
+                    className="text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent"
                   >
                     What would you like to learn today?
                   </motion.h1>
@@ -1770,7 +1700,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="text-lg text-gray-600"
+                    className="text-lg text-muted-foreground"
                   >
                     Upload your materials, paste content, or ask questions to get started
                   </motion.p>
@@ -1786,43 +1716,43 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                   >
                     {/* Upload Files */}
                     <Card 
-                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group"
+                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-primary group"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <div className="text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Upload className="h-8 w-8 text-black" />
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload className="h-8 w-8 text-foreground" />
                         </div>
                         <h3 className="font-semibold text-lg mb-2">Upload Files</h3>
-                        <p className="text-sm text-gray-600">PDFs, Documents, Images</p>
-                        <p className="text-xs text-gray-400 mt-2">Drag & drop supported</p>
+                        <p className="text-sm text-muted-foreground">PDFs, Documents, Images</p>
+                        <p className="text-xs text-muted-foreground/70 mt-2">Drag & drop supported</p>
                       </div>
                     </Card>
 
                     {/* Paste Content */}
                     <Card 
-                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group"
+                      className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-primary group"
                       onClick={() => setShowPasteModal(true)}
                     >
                       <div className="text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Link2 className="h-8 w-8 text-black" />
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Link2 className="h-8 w-8 text-foreground" />
                         </div>
                         <h3 className="font-semibold text-lg mb-2">Paste Content</h3>
-                        <p className="text-sm text-gray-600">YouTube, Web links, Text</p>
-                        <p className="text-xs text-gray-400 mt-2">Smart content extraction</p>
+                        <p className="text-sm text-muted-foreground">YouTube, Web links, Text</p>
+                        <p className="text-xs text-muted-foreground/70 mt-2">Smart content extraction</p>
                       </div>
                     </Card>
 
                     {/* Record Audio */}
-                    <Card className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-black group">
+                    <Card className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-primary group">
                       <div className="text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Mic className="h-8 w-8 text-black" />
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Mic className="h-8 w-8 text-foreground" />
                         </div>
                         <h3 className="font-semibold text-lg mb-2">Record Audio</h3>
-                        <p className="text-sm text-gray-600">Voice notes, Lectures</p>
-                        <p className="text-xs text-gray-400 mt-2">Live transcription</p>
+                        <p className="text-sm text-muted-foreground">Voice notes, Lectures</p>
+                        <p className="text-xs text-muted-foreground/70 mt-2">Live transcription</p>
                       </div>
                     </Card>
                   </motion.div>
@@ -1836,13 +1766,13 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                     transition={{ delay: 0.4 }}
                     className="mt-12 text-center"
                   >
-                    <p className="text-sm text-gray-500 mb-4">Popular topics</p>
+                    <p className="text-sm text-muted-foreground mb-4">Popular topics</p>
                     <div className="flex flex-wrap justify-center gap-2">
                       {['Biology', 'History', 'Mathematics', 'Literature', 'Physics', 'Chemistry'].map((topic) => (
                         <Badge 
                           key={topic}
                           variant="secondary" 
-                          className="cursor-pointer hover:bg-black hover:text-white transition-colors"
+                          className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
                           onClick={() => {
                             setInput(`Teach me about ${topic}`);
                             setShowLandingPage(false);
@@ -1873,17 +1803,17 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                 >
                   {message.role === 'assistant' && (
                     <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className="bg-black text-white">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-sm">
                         <Bot className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
                   )}
                   
                   <div className={cn(
-                      "group relative max-w-[80%] rounded-2xl px-4 py-3",
-                      message.role === 'user' 
-                        ? 'bg-black text-white ml-12' 
-                        : 'bg-gray-100 text-gray-900 mr-12'
+                    "group relative max-w-[80%] rounded-2xl px-5 py-4 shadow-sm",
+                    message.role === 'user' 
+                      ? 'bg-muted/30 text-foreground border border-border/50' 
+                      : 'bg-card text-foreground border border-border'
                     )}>
                     {/* Message content */}
                     {message.isTyping ? (
@@ -1892,7 +1822,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                           {[0, 1, 2].map((i) => (
                             <motion.div
                               key={i}
-                              className="w-2 h-2 bg-gray-400 rounded-full"
+                              className="w-2 h-2 bg-muted-foreground rounded-full"
                               animate={{ y: [0, -10, 0] }}
                               transition={{
                                 duration: 0.6,
@@ -1906,8 +1836,10 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                     ) : (
                       <>
                         <div className={cn(
-                          "prose prose-sm max-w-none",
-                          message.role === 'user' && "prose-invert"
+                          "prose prose-sm max-w-none leading-relaxed",
+                          message.role === 'user' 
+                            ? "prose-slate dark:prose-invert [&_code]:bg-muted/50" 
+                            : "prose-slate dark:prose-invert [&_code]:bg-muted"
                         )}>
                           <ReactMarkdown>{message.content}</ReactMarkdown>
                         </div>
@@ -1934,8 +1866,8 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                           <div className="mt-3 space-y-2">
                             {/* Quiz Mode Selection */}
                             <div className="flex items-center gap-2 text-sm">
-                              <span className="text-gray-600">Mode:</span>
-                              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                              <span className="text-muted-foreground">Mode:</span>
+                              <div className="flex items-center bg-muted rounded-lg p-1">
                                 <Button
                                   variant={quizMode === 'multiple-choice' ? 'default' : 'ghost'}
                                   size="sm"
@@ -1971,7 +1903,10 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-3 space-y-2">
                             {message.attachments.map((attachment) => (
-                              <div key={attachment.id} className="flex items-center gap-2 p-2 bg-white/10 rounded-lg">
+                              <div key={attachment.id} className={cn(
+                                "flex items-center gap-2 p-2 rounded-lg",
+                                message.role === 'user' ? "bg-muted/50" : "bg-muted/30"
+                              )}>
                                 <FileIcon className="h-4 w-4" />
                                 <span className="text-sm">{attachment.name}</span>
                               </div>
@@ -1981,8 +1916,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                         
                         {/* Message metadata */}
                         <div className={cn(
-                          "flex items-center gap-2 mt-2 text-xs",
-                          message.role === 'user' ? 'text-white/80' : 'text-gray-500'
+                          "flex items-center gap-2 mt-2 text-xs text-muted-foreground"
                         )}>
                           <Clock className="h-3 w-3" />
                           {new Date(message.timestamp).toLocaleTimeString([], { 
@@ -2059,7 +1993,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
 
                   {message.role === 'user' && (
                     <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className="bg-gray-200">
+                      <AvatarFallback className="bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm">
                         <User className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
@@ -2071,8 +2005,79 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
         </ScrollArea>
         </div>
 
+        {/* AI Tools Row - Compact */}
+        <div className="border-t border-border bg-muted px-4 py-2 flex-shrink-0">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-2 justify-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenSettingsModal('flashcards')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-xs hover:bg-white hover:shadow-sm transition-all"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Flashcards
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Generate study flashcards</TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenSettingsModal('quiz')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-xs hover:bg-white hover:shadow-sm transition-all"
+                  >
+                    <Brain className="h-3 w-3 mr-1" />
+                    Quiz
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Create practice quiz</TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => generateContent('summary')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-xs hover:bg-white hover:shadow-sm transition-all"
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    Summary
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Generate content summary</TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => generateContent('notes')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-xs hover:bg-white hover:shadow-sm transition-all"
+                  >
+                    <StickyNote className="h-3 w-3 mr-1" />
+                    Notes
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Generate study notes</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+
         {/* Input Area - Sticky at bottom */}
-        <div className="border-t bg-white/80 backdrop-blur-sm px-4 py-4 flex-shrink-0">
+        <div className="border-t border-border bg-muted px-4 py-4 flex-shrink-0">
           <div className="max-w-4xl mx-auto">
             {/* File attachments preview */}
             {attachments.length > 0 && (
@@ -2080,7 +2085,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                 {attachments.map((attachment) => (
                   <div 
                     key={attachment.id}
-                    className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 text-sm"
+                    className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm"
                   >
                     {attachment.status === 'uploading' && (
                       <>
@@ -2130,7 +2135,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask anything..."
-                  className="min-h-[52px] max-h-[200px] pr-12 resize-none rounded-xl"
+                  className="min-h-[52px] max-h-[200px] pr-12 resize-none rounded-xl bg-card border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-sm"
                   disabled={isLoading}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2166,7 +2171,7 @@ export function ModernChatInterface({ sessionId, userId, onNewContent }: ModernC
               </Button>
             </div>
             
-            <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for new line</span>
               <span>Powered by GPT-4</span>
             </div>

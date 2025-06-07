@@ -3,9 +3,10 @@ import { createClient } from '@/supabase/server';
 import OpenAI from 'openai';
 import { createClient as createDeepgramClient } from '@deepgram/sdk';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// Initialize OpenAI if API key is available
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // Initialize Deepgram if API key is available
 const deepgram = process.env.DEEPGRAM_API_KEY 
@@ -14,7 +15,30 @@ const deepgram = process.env.DEEPGRAM_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
+    // Check for test requests first (don't require auth for test)
+    const contentType = request.headers.get('content-type');
+    if (contentType?.includes('application/json')) {
+      try {
+        const body = await request.json();
+        if (body.test) {
+          console.log('🧪 Test request received');
+          return NextResponse.json({
+            text: 'Test transcription successful',
+            confidence: 1,
+            test: true,
+            apiKeys: {
+              openai: !!openai,
+              deepgram: !!deepgram
+            },
+            note: 'This is a test response'
+          });
+        }
+      } catch (jsonError) {
+        // Not JSON, continue to form data handling
+      }
+    }
+
+    // Check authentication for real transcription requests
     const supabase = await createClient();
     const {
       data: { user },
@@ -24,7 +48,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get form data
+    console.log('✅ User authenticated:', user.id);
+
+    // Get form data for real transcription requests
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
     const useDeepgram = formData.get('useDeepgram') === 'true';
@@ -81,6 +107,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Use OpenAI Whisper as primary or fallback
+    if (!openai) {
+      console.error('No transcription services available - API keys not configured');
+      return NextResponse.json({
+        text: '',
+        confidence: 0,
+        error: 'Transcription services not configured',
+        fallbackToBrowser: true
+      }, { status: 503 });
+    }
+
     try {
       // Convert File to proper format for OpenAI
       const audioBuffer = await audioFile.arrayBuffer();
@@ -146,21 +182,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Handle Deepgram fallback errors
-async function handleTranscriptionFallback(audioFile: File) {
-  try {
-    // This is a placeholder for browser-based fallback
-    // In practice, this would be handled client-side
-    return NextResponse.json({
-      text: '',
-      confidence: 0,
-      error: 'Primary transcription failed',
-      fallbackToBrowser: true
-    }, { status: 503 });
-  } catch (error) {
-    console.error('Fallback transcription error:', error);
-    throw error;
-  }
-}
+} 

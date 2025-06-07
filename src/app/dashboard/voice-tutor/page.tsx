@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import DashboardNavbar from '@/components/dashboard-navbar';
 import VoiceChatLoop from '@/components/voice/continuous/VoiceChatLoop';
 import { ConversationStatus } from '@/components/voice/continuous/ConversationStatus';
 import { Card } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createClient } from '@/supabase/client';
 import { Mic, MicOff, Info, Settings2, MessageSquare } from 'lucide-react';
 import { ConversationState } from '@/components/voice/continuous/ConversationStateMachine';
+import { TestTranscription } from '@/components/voice/test-transcription';
 
 export default function VoiceTutorPage() {
   const router = useRouter();
@@ -194,10 +196,13 @@ export default function VoiceTutorPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Initializing voice tutor...</p>
+      <div className="min-h-screen bg-background">
+        <DashboardNavbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>Initializing voice tutor...</p>
+          </div>
         </div>
       </div>
     );
@@ -205,15 +210,22 @@ export default function VoiceTutorPage() {
 
   if (error) {
     return (
-      <Alert variant="destructive" className="max-w-2xl mx-auto mt-8">
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="min-h-screen bg-background">
+        <DashboardNavbar />
+        <div className="container mx-auto px-4 py-8">
+          <Alert variant="destructive" className="max-w-2xl mx-auto mt-8">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="container max-w-4xl mx-auto py-8 px-4">
+    <div className="min-h-screen bg-background">
+      <DashboardNavbar />
+      <div className="container max-w-4xl mx-auto py-8 px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">AI Voice Tutor</h1>
         <p className="text-muted-foreground">
@@ -245,6 +257,236 @@ export default function VoiceTutorPage() {
         </TabsList>
 
         <TabsContent value="continuous" className="space-y-6">
+          {/* Direct transcription test */}
+          <TestTranscription />
+          
+          {/* VAD Mode Selector */}
+          <Card className="p-4 mb-4 bg-yellow-50">
+            <h4 className="font-semibold mb-2">🔧 VAD Troubleshooting</h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              If the complex VAD keeps misfiring immediately, try the simple VAD mode instead
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  addDebugLog('VAD', 'Switching to Simple VAD mode');
+                  window.location.reload(); // Simple way to reset VAD state
+                }}
+              >
+                🔧 Try Simple VAD Mode
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  // Manual test similar to the test transcription but using MediaRecorder
+                  try {
+                    addDebugLog('MANUAL', 'Starting manual speech test...');
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const mediaRecorder = new MediaRecorder(stream);
+                    const chunks: Blob[] = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                      chunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                      addDebugLog('MANUAL', 'Processing manual speech...');
+                      const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                      
+                      // Send to transcription API
+                      const formData = new FormData();
+                      formData.append('audio', audioBlob, 'manual-speech.webm');
+                      
+                      const response = await fetch('/api/voice/transcribe-streaming', {
+                        method: 'POST',
+                        body: formData
+                      });
+
+                      if (response.ok) {
+                        const result = await response.json();
+                        const transcribedText = result.text || '';
+                        addDebugLog('MANUAL', `Transcribed: "${transcribedText}"`);
+                        handleTranscript(transcribedText);
+                        
+                        // Get AI response if text exists
+                        if (transcribedText.trim()) {
+                          const chatResponse = await fetch('/api/chat/messages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              sessionId,
+                              message: transcribedText,
+                              isVoice: true,
+                              isContinuous: true
+                            })
+                          });
+
+                          if (chatResponse.ok) {
+                            const chatData = await chatResponse.json();
+                            const aiText = chatData.aiMessage?.content || '';
+                            addDebugLog('MANUAL', `AI: "${aiText.substring(0, 50)}..."`);
+                            handleAIResponse(aiText);
+                            
+                            // Play TTS response
+                            try {
+                              const ttsResponse = await fetch('/api/voice/speak-streaming', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: aiText })
+                              });
+                              
+                              if (ttsResponse.ok) {
+                                const audioBlob = await ttsResponse.blob();
+                                const audioUrl = URL.createObjectURL(audioBlob);
+                                const audio = new Audio(audioUrl);
+                                
+                                audio.onended = () => {
+                                  URL.revokeObjectURL(audioUrl);
+                                  addDebugLog('MANUAL', 'AI response audio finished');
+                                };
+                                
+                                audio.play();
+                                addDebugLog('MANUAL', 'Playing AI response audio');
+                              }
+                            } catch (ttsError) {
+                              addDebugLog('ERROR', `TTS failed: ${ttsError}`);
+                            }
+                          }
+                        }
+                      } else {
+                        addDebugLog('ERROR', `Transcription failed: ${response.status}`);
+                      }
+                      
+                      stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    addDebugLog('MANUAL', 'Recording for 4 seconds... Speak now!');
+                    mediaRecorder.start();
+                    
+                    setTimeout(() => {
+                      if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                      }
+                    }, 4000);
+                    
+                  } catch (error) {
+                    addDebugLog('ERROR', `Manual speech test failed: ${error}`);
+                  }
+                }}
+                disabled={!sessionId}
+              >
+                🎙️ Manual Speech Test (4s)
+              </Button>
+            </div>
+          </Card>
+          
+          {/* Manual voice test button */}
+          <Card className="p-4 mb-4 bg-blue-50">
+            <h4 className="font-semibold mb-2">🎤 Manual Voice Test (Bypass VAD)</h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Since VAD is misfiring, try this manual recording to test the full pipeline
+            </p>
+            <Button
+              onClick={async () => {
+                try {
+                  addDebugLog('MANUAL', 'Starting manual voice recording...');
+                  
+                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  const mediaRecorder = new MediaRecorder(stream);
+                  const chunks: Blob[] = [];
+
+                  mediaRecorder.ondataavailable = (event) => {
+                    chunks.push(event.data);
+                  };
+
+                  mediaRecorder.onstop = async () => {
+                    addDebugLog('MANUAL', 'Processing manual recording...');
+                    const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                    
+                    // Send to transcription API
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'manual-recording.webm');
+                    
+                    const response = await fetch('/api/voice/transcribe-streaming', {
+                      method: 'POST',
+                      body: formData
+                    });
+
+                    if (response.ok) {
+                      const result = await response.json();
+                      const transcribedText = result.text || '';
+                      addDebugLog('MANUAL', `Transcribed: "${transcribedText}"`);
+                      
+                      // Add to conversation
+                      handleTranscript(transcribedText);
+                      
+                      // Get AI response
+                      if (transcribedText.trim()) {
+                        const chatResponse = await fetch('/api/chat/messages', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            sessionId,
+                            message: transcribedText,
+                            isVoice: true,
+                            isContinuous: true
+                          })
+                        });
+
+                        if (chatResponse.ok) {
+                          const chatData = await chatResponse.json();
+                          const aiText = chatData.aiMessage?.content || '';
+                          addDebugLog('MANUAL', `AI responded: "${aiText.substring(0, 50)}..."`);
+                          handleAIResponse(aiText);
+                          
+                          // Play TTS
+                          try {
+                            const ttsResponse = await fetch('/api/voice/speak-streaming', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ text: aiText })
+                            });
+                            
+                            if (ttsResponse.ok) {
+                              const audioBlob = await ttsResponse.blob();
+                              const audioUrl = URL.createObjectURL(audioBlob);
+                              const audio = new Audio(audioUrl);
+                              audio.play();
+                              addDebugLog('MANUAL', 'Playing AI response audio');
+                            }
+                          } catch (ttsError) {
+                            addDebugLog('ERROR', `TTS failed: ${ttsError}`);
+                          }
+                        }
+                      }
+                    }
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                  };
+
+                  addDebugLog('MANUAL', 'Recording for 4 seconds...');
+                  mediaRecorder.start();
+                  
+                  setTimeout(() => {
+                    if (mediaRecorder.state === 'recording') {
+                      mediaRecorder.stop();
+                    }
+                  }, 4000);
+                  
+                } catch (error) {
+                  addDebugLog('ERROR', `Manual recording failed: ${error}`);
+                }
+              }}
+              disabled={!sessionId}
+            >
+              🎙️ Record Voice Message (4s)
+            </Button>
+          </Card>
+          
           {/* Main voice interface */}
           <VoiceChatLoop
             sessionId={sessionId}
@@ -302,6 +544,46 @@ export default function VoiceTutorPage() {
               disabled={!sessionId}
             >
               Test APIs
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  // Test the full pipeline with a fake transcription
+                  const testText = "Hello, this is a test message.";
+                  addDebugLog('TEST', `Testing full pipeline with: "${testText}"`);
+                  
+                  // Simulate transcription
+                  handleTranscript(testText);
+                  
+                  // Test the chat API
+                  const response = await fetch('/api/chat/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sessionId,
+                      message: testText,
+                      isVoice: true,
+                      isContinuous: true
+                    })
+                  });
+
+                  if (response.ok) {
+                    const data = await response.json();
+                    const aiText = data.aiMessage?.content || '';
+                    addDebugLog('TEST', `AI Response: ${aiText.substring(0, 50)}...`);
+                    handleAIResponse(aiText);
+                  } else {
+                    addDebugLog('ERROR', `Chat API failed: ${response.status}`);
+                  }
+                } catch (error) {
+                  addDebugLog('ERROR', `Pipeline test failed: ${error}`);
+                }
+              }}
+              disabled={!sessionId}
+            >
+              Test Pipeline
             </Button>
             <Button
               variant="outline"
@@ -398,6 +680,7 @@ export default function VoiceTutorPage() {
           </div>
         )}
       </Card>
+      </div>
     </div>
   );
 } 

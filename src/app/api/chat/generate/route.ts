@@ -667,6 +667,19 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("❌ Error generating content:", error);
+    
+    // Enhanced error logging for better debugging
+    if (error instanceof Error) {
+      console.error("❌ Error message:", error.message);
+      console.error("❌ Error name:", error.name);
+      
+      // Check if it's a JSON parsing error specifically
+      if (error.message.includes('JSON') || error.message.includes('position')) {
+        console.error("🔍 This appears to be a JSON parsing error from the AI service");
+        console.error("🔍 Check the AI response format and parsing logic");
+      }
+    }
+    
     return NextResponse.json(
       { error: "Internal server error: " + (error instanceof Error ? error.message : String(error)) },
       { status: 500 }

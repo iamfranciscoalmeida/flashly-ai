@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/supabase/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// Initialize OpenAI if API key is available
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // Available voices for OpenAI TTS
 type VoiceOption = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
@@ -22,7 +23,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get request body
-    const { text, voice = 'alloy', speed = 1.0, response_format = 'mp3' } = await request.json();
+    const { text, voice = 'alloy', speed = 1.0, response_format = 'mp3', test } = await request.json();
+
+    // Handle test requests
+    if (test) {
+      return NextResponse.json({
+        message: 'TTS API is working',
+        test: true,
+        availableVoices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
+        apiConfigured: !!process.env.OPENAI_API_KEY
+      });
+    }
 
     if (!text) {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 });
@@ -41,6 +52,14 @@ export async function POST(request: NextRequest) {
       speed: validSpeed,
       format: response_format
     });
+
+    // Check if OpenAI is configured
+    if (!openai) {
+      return NextResponse.json({
+        error: 'TTS service not configured',
+        fallbackToBrowser: true
+      }, { status: 503 });
+    }
 
     try {
       // Generate speech using OpenAI TTS

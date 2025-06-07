@@ -5,17 +5,17 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-50 border-t border-gray-100">
+    <footer className="bg-muted border-t border-border">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-12">
           {/* Product Column */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Product</h3>
+            <h3 className="font-semibold text-foreground mb-4">Product</h3>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="#features"
-                  className="text-gray-600 hover:text-blue-600"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Features
                 </Link>
@@ -23,7 +23,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="#pricing"
-                  className="text-gray-600 hover:text-blue-600"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Pricing
                 </Link>
@@ -31,13 +31,13 @@ export default function Footer() {
               <li>
                 <Link
                   href="/dashboard"
-                  className="text-gray-600 hover:text-blue-600"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                   Mobile App
                 </Link>
               </li>
@@ -46,15 +46,15 @@ export default function Footer() {
 
           {/* Support Column */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Support</h3>
+            <h3 className="font-semibold text-foreground mb-4">Support</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/faq" className="text-gray-600 hover:text-blue-600">
+                <Link href="/faq" className="text-muted-foreground hover:text-foreground transition-colors">
                   FAQs
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-gray-600 hover:text-blue-600">
+                <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
                   Contact Us
                 </Link>
               </li>
@@ -63,25 +63,25 @@ export default function Footer() {
 
           {/* Legal Column */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Legal</h3>
+            <h3 className="font-semibold text-foreground mb-4">Legal</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/privacy-policy" className="text-gray-600 hover:text-blue-600">
+                <Link href="/privacy-policy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms-of-service" className="text-gray-600 hover:text-blue-600">
+                <Link href="/terms-of-service" className="text-muted-foreground hover:text-foreground transition-colors">
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                   Data Security
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-600 hover:text-blue-600">
+                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                   Accessibility
                 </Link>
               </li>
@@ -89,21 +89,21 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-gray-200">
-          <div className="text-gray-600 mb-4 md:mb-0">
+        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-border">
+          <div className="text-muted-foreground mb-4 md:mb-0">
             © {currentYear} StudyWithAI. All rights reserved.
           </div>
 
           <div className="flex space-x-6">
-            <a href="#" className="text-gray-400 hover:text-gray-500">
+            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
               <span className="sr-only">Twitter</span>
               <Twitter className="h-6 w-6" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-gray-500">
+            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
               <span className="sr-only">LinkedIn</span>
               <Linkedin className="h-6 w-6" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-gray-500">
+            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
               <span className="sr-only">GitHub</span>
               <Github className="h-6 w-6" />
             </a>

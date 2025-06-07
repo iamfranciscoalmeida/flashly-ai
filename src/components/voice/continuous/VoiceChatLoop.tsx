@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useConversationStateMachine, ConversationState, getStateMessage } from './ConversationStateMachine';
 import { useVADProcessor } from './VADProcessor';
+import { useSimpleVAD } from './SimpleVAD';
 import { useContinuousRecorder, float32ArrayToBlob } from './ContinuousRecorder';
 import { useStreamingTranscriber } from './StreamingTranscriber';
 import { useTTSPlayer } from './TTSPlayer';
@@ -41,6 +42,8 @@ export default function VoiceChatLoop({
   const [transcript, setTranscript] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [vadType, setVadType] = useState<'simple' | 'advanced'>('advanced');
+  const [vadMisfires, setVadMisfires] = useState(0);
 
   // State machine
   const {
@@ -79,20 +82,40 @@ export default function VoiceChatLoop({
     stop: stopVAD
   } = useVADProcessor({
     enabled: isEnabled && currentState === ConversationState.LISTENING,
+    // Adjust VAD sensitivity to reduce misfires
+    silenceThreshold: -40,    // Less sensitive to background noise
+    silenceDuration: 1200,    // Wait longer before considering speech ended
+    speechThreshold: -35,     // Higher threshold for speech detection
     onSpeechStart: () => {
-      console.log('Speech detected, starting recording');
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🎙️ [${timestamp}] VAD: Speech detected, starting recording`);
       transitionTo(ConversationState.RECORDING);
     },
     onSpeechEnd: async (audio) => {
-      console.log('Speech ended, processing audio');
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🎙️ [${timestamp}] VAD: Speech ended, processing audio (${audio.length} samples)`);
       transitionTo(ConversationState.PROCESSING);
       
       // Convert Float32Array to Blob and transcribe
       const audioBlob = float32ArrayToBlob(audio);
+      console.log(`📝 [${timestamp}] TRANSCRIPTION: Sending audio blob to transcriber (${audioBlob.size} bytes)`);
       transcriber.addToQueue(audioBlob);
     },
     onVADMisfire: () => {
-      console.log('VAD misfire, returning to listening');
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`⚠️ [${timestamp}] VAD: Misfire detected - speech was too short or quiet, returning to listening`);
+      
+      // Track misfires and suggest fallback after too many
+      setVadMisfires((prev: number) => {
+        const newCount = prev + 1;
+        if (newCount >= 5) {
+          console.warn(`🔄 [${timestamp}] Too many VAD misfires (${newCount}). Switching to SimpleVAD.`);
+          setVadType('simple');
+          return 0; // Reset count
+        }
+        return newCount;
+      });
+      
       if (currentState === ConversationState.RECORDING) {
         transitionTo(ConversationState.LISTENING);
       }
@@ -120,13 +143,35 @@ export default function VoiceChatLoop({
   // Streaming transcriber
   const transcriber = useStreamingTranscriber({
     onTranscription: async (result) => {
-      console.log('Transcription result:', result);
+      const transcriptionStartTime = Date.now();
+      const timestamp = new Date().toLocaleTimeString();
+      
+      console.log(`🎤 [${timestamp}] TRANSCRIPTION COMPLETE:`, {
+        text: result.text,
+        confidence: result.confidence,
+        length: result.text.length
+      });
+      
       setTranscript(result.text);
       onTranscript(result.text);
       updateActivity();
 
+      // Skip empty transcriptions
+      if (!result.text.trim()) {
+        console.log(`⚠️ [${timestamp}] Empty transcription, returning to listening`);
+        transitionTo(ConversationState.LISTENING);
+        return;
+      }
+
       // Send to chat API
       try {
+        const chatStartTime = Date.now();
+        console.log(`🤖 [${timestamp}] SENDING TO AI:`, {
+          message: result.text,
+          sessionId: sessionId.substring(0, 8) + '...',
+          vadConfidence: result.confidence
+        });
+
         const response = await fetch('/api/chat/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -139,12 +184,26 @@ export default function VoiceChatLoop({
           })
         });
 
+        const chatResponseTime = Date.now() - chatStartTime;
+
         if (!response.ok) {
-          throw new Error('Failed to get AI response');
+          console.error(`❌ [${timestamp}] Chat API failed:`, {
+            status: response.status,
+            statusText: response.statusText,
+            responseTime: chatResponseTime
+          });
+          throw new Error(`Chat API failed: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         const aiText = data.aiMessage?.content || '';
+        
+        console.log(`✅ [${timestamp}] AI RESPONSE RECEIVED:`, {
+          responseLength: aiText.length,
+          responseTime: chatResponseTime,
+          preview: aiText.substring(0, 100) + (aiText.length > 100 ? '...' : ''),
+          totalProcessingTime: Date.now() - transcriptionStartTime
+        });
         
         setAiResponse(aiText);
         onAIResponse(aiText);
@@ -153,9 +212,27 @@ export default function VoiceChatLoop({
         transitionTo(ConversationState.SPEAKING);
         
         // Generate TTS
+        const ttsStartTime = Date.now();
+        console.log(`🔊 [${timestamp}] STARTING TTS GENERATION:`, {
+          textLength: aiText.length,
+          estimatedDuration: Math.ceil(aiText.length / 10) + 's'
+        });
+
         ttsPlayer.speak(aiText, {
+          onStart: () => {
+            const ttsGenerationTime = Date.now() - ttsStartTime;
+            console.log(`▶️ [${new Date().toLocaleTimeString()}] TTS PLAYBACK STARTED:`, {
+              generationTime: ttsGenerationTime,
+              totalPipelineTime: Date.now() - transcriptionStartTime
+            });
+          },
           onEnd: () => {
-            console.log('TTS finished, returning to listening');
+            const totalTime = Date.now() - transcriptionStartTime;
+            console.log(`⏹️ [${new Date().toLocaleTimeString()}] TTS PLAYBACK FINISHED:`, {
+              totalConversationTime: totalTime,
+              nextAction: autoRestart && isActive ? 'returning to listening' : 'going idle'
+            });
+            
             if (autoRestart && isActive) {
               transitionTo(ConversationState.LISTENING);
             } else {
@@ -164,24 +241,66 @@ export default function VoiceChatLoop({
           }
         });
       } catch (error) {
-        console.error('Chat API error:', error);
+        const errorTime = Date.now() - transcriptionStartTime;
+        console.error(`❌ [${timestamp}] CHAT API ERROR (after ${errorTime}ms):`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
         handleStateMachineError(error as Error);
       }
     },
-    onError: handleStateMachineError
+    onError: (error) => {
+      console.error(`❌ [${new Date().toLocaleTimeString()}] TRANSCRIPTION ERROR:`, error);
+      handleStateMachineError(error);
+    }
+  });
+
+  // Simple VAD as fallback when complex VAD misfires too much
+  const simpleVAD = useSimpleVAD({
+    enabled: vadType === 'simple' && isEnabled && currentState === ConversationState.LISTENING,
+    speechThreshold: -30,
+    silenceThreshold: -40,
+    silenceDuration: 2000,
+    minSpeechDuration: 800,
+    onSpeechStart: () => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🔧 [${timestamp}] SIMPLE VAD: Speech detected, starting recording`);
+      transitionTo(ConversationState.RECORDING);
+    },
+    onSpeechEnd: async (audio: Float32Array) => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🔧 [${timestamp}] SIMPLE VAD: Speech ended, processing audio (${audio.length} samples)`);
+      transitionTo(ConversationState.PROCESSING);
+      
+      // Convert Float32Array to Blob and transcribe
+      const audioBlob = float32ArrayToBlob(audio);
+      console.log(`📝 [${timestamp}] TRANSCRIPTION: Sending audio blob to transcriber (${audioBlob.size} bytes)`);
+      transcriber.addToQueue(audioBlob);
+    },
+    onError: (error: Error) => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.error(`❌ [${timestamp}] SIMPLE VAD ERROR:`, error);
+      handleStateMachineError(error);
+    }
   });
 
   // TTS player
   const ttsPlayer = useTTSPlayer({
     onPlaybackStart: () => {
-      console.log('TTS playback started');
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🔊 [${timestamp}] TTS PLAYER: Starting audio playback`);
       updateActivity();
     },
     onPlaybackEnd: () => {
-      console.log('TTS playback ended');
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`🔇 [${timestamp}] TTS PLAYER: Audio playback complete`);
       updateActivity();
     },
-    onError: handleStateMachineError
+    onError: (error) => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.error(`❌ [${timestamp}] TTS PLAYER ERROR:`, error);
+      handleStateMachineError(error);
+    }
   });
 
   // Handle enable/disable

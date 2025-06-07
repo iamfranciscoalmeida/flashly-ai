@@ -16,7 +16,9 @@ import {
   Mic,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import UserProfile from "./user-profile";
+import EnhancedUserProfile from "./enhanced-user-profile";
+import LanguageSelector from "./language-selector";
+import { ThemeToggle } from "./theme-toggle";
 import Logo from "./logo";
 
 export default function DashboardNavbar() {
@@ -29,12 +31,12 @@ export default function DashboardNavbar() {
   };
 
   return (
-    <nav className="w-full border-b border-gray-200 bg-white py-4">
+    <nav className="w-full border-b border-border bg-background py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link href="/" prefetch className="flex items-center group">
             <Logo className="mr-3 transition-transform duration-200 group-hover:scale-105" />
-            <span className="text-2xl font-extrabold bg-gradient-to-r from-black to-gray-800 bg-clip-text text-transparent">
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
               StudyWithAI
             </span>
           </Link>
@@ -78,7 +80,9 @@ export default function DashboardNavbar() {
 
           </div>
         </div>
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-2 items-center">
+          <LanguageSelector />
+          <ThemeToggle />
           <Link href="/" className="hidden md:flex">
             <Button
               variant="ghost"
@@ -89,7 +93,7 @@ export default function DashboardNavbar() {
               <span>Home</span>
             </Button>
           </Link>
-          <UserProfile />
+          <EnhancedUserProfile />
         </div>
       </div>
     </nav>

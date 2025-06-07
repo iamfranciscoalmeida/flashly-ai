@@ -17,8 +17,7 @@ export default function EnhancedCtaFooter() {
             </h2>
             
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-              Join <span className="text-white font-semibold">10,000+ students</span> who are 
-              already on the waitlist. Don't miss your chance to transform how you learn.
+              Join other students who are already on the waitlist. Don't miss your chance to transform how you learn.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12">

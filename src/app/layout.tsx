@@ -1,5 +1,8 @@
 import { TempoInit } from "@/components/tempo-init";
 import SyncSubscription from "@/components/sync-subscription";
+import { ThemeProvider } from "@/components/theme-provider";
+import { LanguageProvider } from "@/components/language-provider";
+import { Toaster } from "@/components/ui/toaster";
 import { Analytics } from '@vercel/analytics/react';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -14,6 +17,7 @@ export const metadata: Metadata = {
     "Transform your study materials into interactive flashcards and quizzes with our AI-powered learning platform",
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
     ],
@@ -31,19 +35,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
-        <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/site.webmanifest" />
-      </head>
       <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />
       <body className={inter.className}>
-        {children}
-        <TempoInit />
-        <SyncSubscription />
-        <Analytics />
+        <ThemeProvider
+          defaultTheme="system"
+          storageKey="studywith-ai-theme"
+        >
+          <LanguageProvider defaultLanguage="en">
+            {children}
+            <Toaster />
+            <TempoInit />
+            <SyncSubscription />
+            <Analytics />
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

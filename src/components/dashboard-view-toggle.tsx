@@ -20,7 +20,7 @@ export default function DashboardViewToggle({
         pressed={view === "split"}
         onPressedChange={() => onViewChange("split")}
         aria-label="Split view"
-        className="flex gap-2 items-center data-[state=on]:bg-white data-[state=on]:text-primary"
+        className="flex gap-2 items-center data-[state=on]:bg-background data-[state=on]:text-primary"
       >
         <Columns className="h-4 w-4" />
         <span className="hidden sm:inline text-sm">Split</span>
@@ -30,7 +30,7 @@ export default function DashboardViewToggle({
         pressed={view === "full"}
         onPressedChange={() => onViewChange("full")}
         aria-label="Full view"
-        className="flex gap-2 items-center data-[state=on]:bg-white data-[state=on]:text-primary"
+        className="flex gap-2 items-center data-[state=on]:bg-background data-[state=on]:text-primary"
       >
         <Maximize2 className="h-4 w-4" />
         <span className="hidden sm:inline text-sm">Full</span>

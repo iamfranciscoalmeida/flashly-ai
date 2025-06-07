@@ -19,8 +19,8 @@ interface UseVADProcessorProps extends VADConfig {
 export function useVADProcessor({
   enabled = false,
   silenceThreshold = -45,
-  silenceDuration = 800,
-  speechThreshold = -30,
+  silenceDuration = 1500,      // Increased silence duration
+  speechThreshold = -35,       // More sensitive speech threshold  
   sampleRate = 16000,
   onSpeechStart,
   onSpeechEnd,
@@ -44,7 +44,7 @@ export function useVADProcessor({
       // Create audio context for level monitoring
       audioContextRef.current = new AudioContext({ sampleRate });
       
-      // Configure VAD options
+      // Configure VAD options - More lenient settings to reduce misfires
       const vadOptions: Partial<RealTimeVADOptions> = {
         onSpeechStart: () => {
           console.log('VAD: Speech detected');
@@ -52,21 +52,22 @@ export function useVADProcessor({
           onSpeechStart?.();
         },
         onSpeechEnd: (audio) => {
-          console.log('VAD: Speech ended');
+          console.log('VAD: Speech ended, audio length:', audio.length);
           setIsListening(false);
           onSpeechEnd?.(audio);
         },
         onVADMisfire: () => {
-          console.log('VAD: Misfire');
+          console.log('VAD: Misfire - speech too short or weak');
           setIsListening(false);
           onVADMisfire?.();
         },
-        positiveSpeechThreshold: 0.5,
-        negativeSpeechThreshold: 0.35,
-        redemptionFrames: 8,
+        // More lenient thresholds to reduce misfires
+        positiveSpeechThreshold: 0.3,    // Lower threshold for speech detection
+        negativeSpeechThreshold: 0.15,   // Lower threshold for ending speech
+        redemptionFrames: 12,            // More frames to recover from brief pauses
         frameSamples: 1536,
-        preSpeechPadFrames: 1,
-        minSpeechFrames: 4,
+        preSpeechPadFrames: 2,           // More padding before speech
+        minSpeechFrames: 8,              // Require more frames for valid speech
         submitUserSpeechOnPause: true
       };
 
@@ -167,11 +168,9 @@ export function useVADProcessor({
     }
 
     return () => {
-      if (enabled) {
-        stop();
-      }
+      stop();
     };
-  }, [enabled, start, stop]);
+  }, [enabled]); // Remove start, stop from dependencies to prevent loops
 
   // Cleanup on unmount
   useEffect(() => {

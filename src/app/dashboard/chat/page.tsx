@@ -2,6 +2,7 @@
 
 import { createClient } from "@/supabase/client";
 import { ModernChatInterface } from "@/components/modern-chat-interface";
+import DashboardNavbar from "@/components/dashboard-navbar";
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -12,6 +13,14 @@ function ChatPageContent() {
   const [error, setError] = useState<string>('');
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Prevent page-level scrolling by applying body class
+  useEffect(() => {
+    document.body.classList.add('chat-page-body');
+    return () => {
+      document.body.classList.remove('chat-page-body');
+    };
+  }, []);
 
   // Listen for URL parameter changes
   useEffect(() => {
@@ -66,10 +75,13 @@ function ChatPageContent() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg">Setting up your chat session...</p>
+      <div className="h-screen bg-background overflow-hidden">
+        <DashboardNavbar />
+        <div className="h-[calc(100vh-80px)] flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg">Setting up your chat session...</p>
+          </div>
         </div>
       </div>
     );
@@ -77,15 +89,18 @@ function ChatPageContent() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
-        <div className="text-center">
-          <p className="text-red-600 text-lg mb-4">{error}</p>
-          <button 
-            onClick={initializeChat}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-          >
-            Try Again
-          </button>
+      <div className="h-screen bg-background overflow-hidden">
+        <DashboardNavbar />
+        <div className="h-[calc(100vh-80px)] flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
+          <div className="text-center">
+            <p className="text-red-600 text-lg mb-4">{error}</p>
+            <button 
+              onClick={initializeChat}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -94,27 +109,33 @@ function ChatPageContent() {
   if (!sessionId) {
     // Show the ModernChatInterface without a sessionId - it will handle showing the session selector
     return (
-      <div className="h-screen">
+      <div className="h-screen bg-background overflow-hidden">
+        <DashboardNavbar />
+        <div className="h-[calc(100vh-80px)] overflow-hidden">
+          <ModernChatInterface 
+            sessionId=""
+            userId={userId}
+            onNewContent={(content: string, type: 'upload' | 'paste' | 'record') => {
+              console.log('New content added:', { content: content.substring(0, 100), type });
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen bg-background overflow-hidden">
+      <DashboardNavbar />
+      <div className="h-[calc(100vh-80px)] overflow-hidden">
         <ModernChatInterface 
-          sessionId=""
+          sessionId={sessionId}
           userId={userId}
           onNewContent={(content: string, type: 'upload' | 'paste' | 'record') => {
             console.log('New content added:', { content: content.substring(0, 100), type });
           }}
         />
       </div>
-    );
-  }
-
-  return (
-    <div className="h-screen">
-      <ModernChatInterface 
-        sessionId={sessionId}
-        userId={userId}
-        onNewContent={(content: string, type: 'upload' | 'paste' | 'record') => {
-          console.log('New content added:', { content: content.substring(0, 100), type });
-        }}
-      />
     </div>
   );
 }
@@ -123,10 +144,13 @@ export default function ChatPage() {
   return (
     <Suspense 
       fallback={
-        <div className="h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg">Loading chat...</p>
+        <div className="h-screen bg-background overflow-hidden">
+          <DashboardNavbar />
+          <div className="h-[calc(100vh-80px)] flex items-center justify-center bg-gradient-to-b from-background to-muted">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-lg">Loading chat...</p>
+            </div>
           </div>
         </div>
       }

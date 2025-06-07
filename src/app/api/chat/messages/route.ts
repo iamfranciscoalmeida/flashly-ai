@@ -13,7 +13,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { sessionId, message, attachments, context, audioUrl, isVoice } = await request.json();
+    const { sessionId, message, attachments, context, audioUrl, isVoice, test } = await request.json();
+
+    // Handle test requests
+    if (test) {
+      return NextResponse.json({
+        message: 'Chat API is working',
+        test: true,
+        user: { id: user.id, email: user.email },
+        timestamp: new Date().toISOString()
+      });
+    }
 
     if (!sessionId || !message) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

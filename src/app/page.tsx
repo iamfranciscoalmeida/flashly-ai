@@ -52,7 +52,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted">
       <Navbar />
       
       {/* Conditional Hero Section */}
@@ -62,13 +62,13 @@ export default async function Home() {
       <UseCasesSection />
 
       {/* Features Section */}
-      <section id="features" className="py-24 bg-white">
+      <section id="features" className="py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">
               Revolutionary AI Learning Platform
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Experience the future of education with AI that converts PDFs to videos, 
               provides voice tutoring, and offers intelligent support for students and teachers alike.
             </p>
@@ -102,11 +102,11 @@ export default async function Home() {
             ].map((feature, index) => (
               <div
                 key={index}
-                className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
+                className="p-6 bg-card rounded-xl shadow-sm hover:shadow-md transition-shadow border border-border"
               >
-                <div className="text-black mb-4">{feature.icon}</div>
+                <div className="text-foreground mb-4">{feature.icon}</div>
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <p className="text-muted-foreground">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -146,11 +146,11 @@ export default async function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section id="how-it-works" className="py-24 bg-white">
+      <section id="how-it-works" className="py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Experience next-generation AI learning that adapts to your needs
               and transforms how you study
             </p>
@@ -158,33 +158,33 @@ export default async function Home() {
 
           <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-black text-xl font-bold">1</span>
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-foreground text-xl font-bold">1</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">
                 Upload & Transform
               </h3>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Upload your PDFs and watch them transform into engaging video lessons
               </p>
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-black text-xl font-bold">2</span>
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-foreground text-xl font-bold">2</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">Voice Interaction</h3>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Ask questions and get explanations through natural voice conversations
               </p>
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-black text-xl font-bold">3</span>
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-foreground text-xl font-bold">3</span>
               </div>
               <h3 className="text-xl font-semibold mb-3">Master Content</h3>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Use AI-powered flashcards and personalized tutoring to master any subject
               </p>
             </div>
@@ -200,7 +200,7 @@ export default async function Home() {
 
       {/* Debug Component - Only show in waitlist mode */}
       {isWaitlistMode && (
-        <section className="py-12 bg-gray-50">
+        <section className="py-12 bg-muted">
           <div className="container mx-auto px-4">
             <WaitlistDebug />
           </div>
@@ -209,11 +209,11 @@ export default async function Home() {
 
       {/* Conditional Pricing Section - Only show if not in waitlist mode */}
       {!isWaitlistMode && (
-        <section id="pricing" className="py-24 bg-gray-50">
+        <section id="pricing" className="py-24 bg-muted">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold mb-4">Choose Your Study Plan</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">
+              <p className="text-muted-foreground max-w-2xl mx-auto">
                 Select the plan that fits your study needs and goals
               </p>
             </div>
@@ -230,61 +230,61 @@ export default async function Home() {
       <RoadmapSection />
 
       {/* Testimonials Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">What Students Say</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Join thousands of students who've improved their study habits
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-black font-semibold">J</span>
+                <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mr-3">
+                  <span className="text-foreground font-semibold">J</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Jamie L.</h4>
-                  <p className="text-sm text-gray-500">Medical Student</p>
+                  <p className="text-sm text-muted-foreground">Medical Student</p>
                 </div>
               </div>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 "This platform helped me memorize complex medical terminology in
                 half the time. The flashcards are perfectly tailored to my
                 textbooks."
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-black font-semibold">M</span>
+                <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mr-3">
+                  <span className="text-foreground font-semibold">M</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Michael T.</h4>
-                  <p className="text-sm text-gray-500">Law Student</p>
+                  <p className="text-sm text-muted-foreground">Law Student</p>
                 </div>
               </div>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 "The quizzes generated from my case studies were incredibly
                 helpful for exam prep. I've recommended it to my entire study
                 group."
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
               <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-black font-semibold">S</span>
+                <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mr-3">
+                  <span className="text-foreground font-semibold">S</span>
                 </div>
                 <div>
                   <h4 className="font-semibold">Sarah K.</h4>
-                  <p className="text-sm text-gray-500">Engineering Major</p>
+                  <p className="text-sm text-muted-foreground">Engineering Major</p>
                 </div>
               </div>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 "Being able to upload my lecture notes and instantly get study
                 materials saved me hours of preparation time. My grades have
                 improved significantly."
@@ -302,25 +302,25 @@ export default async function Home() {
 
       {/* Conditional CTA Section - Only show if not in waitlist mode */}
       {!isWaitlistMode && (
-        <section className="py-20 bg-gray-50">
+        <section className="py-20 bg-muted">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold mb-4">
               Ready to Transform Your Study Habits?
             </h2>
-            <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+            <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
               Join thousands of students who are studying smarter, not harder.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
                 href="/sign-up"
-                className="inline-flex items-center px-6 py-3 text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
+                className="inline-flex items-center px-6 py-3 text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Get Started Free
                 <ArrowUpRight className="ml-2 w-4 h-4" />
               </a>
               <a
                 href="#pricing"
-                className="inline-flex items-center px-6 py-3 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                className="inline-flex items-center px-6 py-3 text-muted-foreground bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
               >
                 View Plans
               </a>
