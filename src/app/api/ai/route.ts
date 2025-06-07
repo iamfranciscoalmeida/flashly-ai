@@ -229,7 +229,7 @@ export async function POST(request: Request) {
   try {
     // Check if we're in waitlist mode
     const waitlistCheck = checkWaitlistMode();
-    if (waitlistCheck.isWaitlistMode) {
+    if (waitlistCheck.isWaitlistMode && waitlistCheck.response) {
       return waitlistCheck.response;
     }
 
